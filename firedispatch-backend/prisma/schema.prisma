@@ -1,0 +1,217 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CENTRAL_DISPATCHER
+  STATION_DISPATCHER
+}
+
+enum VehicleType {
+  FIRE_TRUCK
+  LADDER_TRUCK
+  RESCUE_VEHICLE
+  WATER_TANKER
+  COMMAND_VEHICLE
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  ON_DUTY
+  MAINTENANCE
+}
+
+enum IncidentStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+model SystemSettings {
+  id              Int      @id @default(autoincrement())
+  defaultCityName String   @default("Чита")
+  defaultLatitude Float    @default(52.0515) // Широта центра Читы
+  defaultLongitude Float   @default(113.4712) // Долгота центра Читы
+  defaultZoom     Int      @default(12)
+  updatedAt       DateTime @updatedAt
+  updatedById     Int?     // ID администратора, который последним обновил настройки
+  updatedBy       User?    @relation(fields: [updatedById], references: [id])
+
+  @@map("system_settings")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      UserRole
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  fireStation   FireStation? @relation(fields: [fireStationId], references: [id])
+  fireStationId Int?
+  reportedFires FireIncident[] @relation("ReportedBy")
+  assignedFires FireIncident[] @relation("AssignedTo")
+  reports       Report[]
+  activities    UserActivity[]
+  systemUpdates SystemSettings[]
+
+  @@map("users")
+}
+
+model FireStation {
+  id        Int      @id @default(autoincrement())
+  name      String
+  address   String
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users     User[]
+  vehicles  Vehicle[]
+  incidents FireIncident[]
+
+  @@map("fire_stations")
+}
+
+model Vehicle {
+  id            Int           @id @default(autoincrement())
+  model         String
+  type          VehicleType
+  status        VehicleStatus @default(AVAILABLE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  fireStation   FireStation   @relation(fields: [fireStationId], references: [id])
+  fireStationId Int
+  incidents     FireIncident[]
+
+  @@map("vehicles")
+}
+
+model FireLevel {
+  id              Int      @id @default(autoincrement())
+  level           Int      @unique
+  name            String
+  description     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  incidents      FireIncident[]
+  requirements   FireLevelRequirement[]
+  addressLevels  FireAddressLevel[]
+
+  @@map("fire_levels")
+}
+
+model FireLevelRequirement {
+  id              Int           @id @default(autoincrement())
+  count           Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  fireLevel       FireLevel     @relation(fields: [fireLevelId], references: [id], onDelete: Cascade)
+  fireLevelId     Int
+  vehicleType     VehicleType
+  
+  @@unique([fireLevelId, vehicleType])
+  @@map("fire_level_requirements")
+}
+
+model FireIncident {
+  id          Int           @id @default(autoincrement())
+  latitude    Float
+  longitude   Float
+  status      IncidentStatus @default(PENDING)
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  resolvedAt  DateTime?
+  address     String?       // Добавляем поле для адреса
+
+  // Relations
+  reportedBy    User        @relation("ReportedBy", fields: [reportedById], references: [id])
+  reportedById  Int
+  assignedTo    User        @relation("AssignedTo", fields: [assignedToId], references: [id])
+  assignedToId  Int
+  fireStation   FireStation @relation(fields: [fireStationId], references: [id])
+  fireStationId Int
+  fireLevel     FireLevel   @relation(fields: [fireLevelId], references: [id])
+  fireLevelId   Int
+  vehicles      Vehicle[]
+  reports       Report[]
+  history       FireHistory[]
+
+  @@map("fire_incidents")
+}
+
+model FireAddressLevel {
+  id          Int      @id @default(autoincrement())
+  address     String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  fireLevel   FireLevel @relation(fields: [fireLevelId], references: [id], onDelete: Cascade)
+  fireLevelId Int
+
+  @@map("fire_address_levels")
+}
+
+model Report {
+  id             Int          @id @default(autoincrement())
+  content        String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  user           User         @relation(fields: [userId], references: [id])
+  userId         Int
+  fireIncident   FireIncident @relation(fields: [fireIncidentId], references: [id])
+  fireIncidentId Int
+
+  @@map("reports")
+}
+
+model UserActivity {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  action      String
+  details     String?
+  timestamp   DateTime  @default(now())
+  ipAddress   String?
+  userAgent   String?
+
+  @@map("user_activities")
+}
+
+model FireHistory {
+  id              Int       @id @default(autoincrement())
+  fireIncidentId  Int
+  action          String
+  details         String
+  timestamp       DateTime  @default(now())
+  
+  // Relations
+  fireIncident    FireIncident @relation(fields: [fireIncidentId], references: [id], onDelete: Cascade)
+  
+  @@map("fire_history")
+}
