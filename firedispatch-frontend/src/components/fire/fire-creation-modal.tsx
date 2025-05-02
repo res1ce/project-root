@@ -130,11 +130,19 @@ export function FireCreationModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="latitude">Широта</Label>
-              <Input id="latitude" value={location ? location[0].toFixed(6) : ''} disabled />
+              <Input 
+                id="latitude" 
+                value={location && Array.isArray(location) && location.length >= 2 && typeof location[0] === 'number' ? location[0].toFixed(6) : ''} 
+                disabled 
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="longitude">Долгота</Label>
-              <Input id="longitude" value={location ? location[1].toFixed(6) : ''} disabled />
+              <Input 
+                id="longitude" 
+                value={location && Array.isArray(location) && location.length >= 2 && typeof location[1] === 'number' ? location[1].toFixed(6) : ''} 
+                disabled 
+              />
             </div>
           </div>
 

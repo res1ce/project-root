@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { FireMapProps } from './fire-map';
 
 // Динамический импорт компонента карты без SSR
 const FireMapNoSSR = dynamic(
@@ -8,6 +9,6 @@ const FireMapNoSSR = dynamic(
   { ssr: false }
 );
 
-export default function DynamicMap(props: any) {
+export default function DynamicMap(props: FireMapProps) {
   return <FireMapNoSSR {...props} />;
 } 

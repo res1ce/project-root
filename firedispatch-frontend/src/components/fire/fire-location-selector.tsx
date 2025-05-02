@@ -34,14 +34,14 @@ export function FireLocationSelector({ onFireCreated }: FireLocationSelectorProp
   // Handle fire creation modal close
   const handleModalClose = useCallback(() => {
     setIsCreatingFire(false);
-    // Optionally reset selected location after creation
+    // Решили не сбрасывать местоположение при закрытии модального окна
     // setSelectedLocation(null);
   }, []);
   
   // Handle successful fire creation
   const handleFireCreated = useCallback(() => {
     setIsCreatingFire(false);
-    setSelectedLocation(null);
+    setSelectedLocation(null); // Сбрасываем выбранное местоположение только после успешного создания пожара
     onFireCreated?.();
   }, [onFireCreated]);
   
@@ -61,7 +61,12 @@ export function FireLocationSelector({ onFireCreated }: FireLocationSelectorProp
             <div>
               <p className="text-sm font-medium text-gray-700">Выбранное местоположение:</p>
               <p className="text-sm text-gray-500">
-                Широта: {selectedLocation[0].toFixed(6)}, Долгота: {selectedLocation[1].toFixed(6)}
+                Широта: {selectedLocation && Array.isArray(selectedLocation) && selectedLocation.length >= 2 && typeof selectedLocation[0] === 'number' 
+                  ? selectedLocation[0].toFixed(6) 
+                  : '—'}, 
+                Долгота: {selectedLocation && Array.isArray(selectedLocation) && selectedLocation.length >= 2 && typeof selectedLocation[1] === 'number' 
+                  ? selectedLocation[1].toFixed(6) 
+                  : '—'}
               </p>
             </div>
             <Button onClick={handleStartCreation}>

@@ -1,28 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSystemSettingsStore } from '@/store/system-settings-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import { load } from '@2gis/mapgl';
 
-// Исправляем проблему с иконками в Leaflet
-const DEFAULT_ICON = L.icon({
-  iconUrl: '/images/marker-icon.png',
-  iconRetinaUrl: '/images/marker-icon-2x.png',
-  shadowUrl: '/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// Настройки маркера (обновленные для 2GIS)
+const DEFAULT_MARKER_OPTIONS = {
+  icon: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  size: [28, 42],
+  anchor: [14, 42],
+};
 
-L.Marker.prototype.options.icon = DEFAULT_ICON;
+// API ключ для 2GIS
+const API_KEY = process.env.NEXT_PUBLIC_2GIS_API_KEY || '';
 
 export default function MapSettings() {
   const { settings, isLoading, error, fetchSettings, updateSettings } = useSystemSettingsStore();
@@ -31,24 +26,155 @@ export default function MapSettings() {
   const [longitude, setLongitude] = useState<number | ''>('');
   const [zoom, setZoom] = useState<number | ''>('');
   const [selectedPosition, setSelectedPosition] = useState<[number, number] | null>(null);
+  const [mapInitError, setMapInitError] = useState<string | null>(null);
 
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+
+  // Загрузка настроек при монтировании компонента
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
+  // Установка значений формы при загрузке настроек
   useEffect(() => {
     if (settings) {
       setCityName(settings.defaultCityName);
       setLatitude(settings.defaultLatitude);
       setLongitude(settings.defaultLongitude);
       setZoom(settings.defaultZoom);
-      setSelectedPosition([settings.defaultLatitude, settings.defaultLongitude]);
+      setSelectedPosition([settings.defaultLongitude, settings.defaultLatitude]); // [lng, lat] для 2GIS
     }
   }, [settings]);
 
+  // Инициализация и обновление карты при изменении позиции
+  useEffect(() => {
+    if (!mapContainerRef.current || !selectedPosition) return;
+    
+    let mapglInstance: any;
+    let mapInstance: any;
+    
+    async function initMap() {
+      try {
+        console.log("Инициализация карты 2GIS в настройках...");
+        setMapInitError(null);
+        
+        // Проверка API ключа
+        if (!API_KEY) {
+          const error = "Отсутствует API ключ 2GIS";
+          console.error(error);
+          setMapInitError(error);
+          return;
+        }
+        
+        // Очищаем предыдущую карту, если она была
+        if (mapInstanceRef.current) {
+          if (markerRef.current) {
+            try {
+              markerRef.current.destroy();
+            } catch (e) {
+              console.error("Ошибка при удалении маркера:", e);
+            }
+            markerRef.current = null;
+          }
+          
+          try {
+            mapInstanceRef.current.destroy();
+          } catch (e) {
+            console.error("Ошибка при удалении карты:", e);
+          }
+          mapInstanceRef.current = null;
+        }
+        
+        // Загружаем SDK 2GIS
+        mapglInstance = await load();
+        
+        console.log("Создание карты с центром:", selectedPosition, "и зумом:", zoom || 12);
+        
+        // Создаем экземпляр карты
+        mapInstance = new mapglInstance.Map(mapContainerRef.current, {
+          center: selectedPosition,
+          zoom: zoom || 12,
+          key: API_KEY,
+        });
+        
+        mapInstanceRef.current = mapInstance;
+        
+        // Добавляем маркер выбранной позиции
+        markerRef.current = new mapglInstance.Marker(mapInstance, {
+          coordinates: selectedPosition,
+          icon: DEFAULT_MARKER_OPTIONS.icon,
+          size: DEFAULT_MARKER_OPTIONS.size,
+          anchor: DEFAULT_MARKER_OPTIONS.anchor,
+        });
+        
+        // Обработчик клика по карте для выбора позиции
+        mapInstance.on('click', (e: any) => {
+          const { lng, lat } = e.lngLat;
+          console.log("Выбрана новая позиция:", { lng, lat });
+          
+          // Обновляем маркер
+          if (markerRef.current) {
+            try {
+              markerRef.current.destroy();
+            } catch (e) {
+              console.error("Ошибка при удалении маркера:", e);
+            }
+          }
+          
+          markerRef.current = new mapglInstance.Marker(mapInstance, {
+            coordinates: [lng, lat],
+            icon: DEFAULT_MARKER_OPTIONS.icon,
+            size: DEFAULT_MARKER_OPTIONS.size,
+            anchor: DEFAULT_MARKER_OPTIONS.anchor,
+          });
+          
+          // Обновляем состояние
+          setLatitude(lat);
+          setLongitude(lng);
+          setSelectedPosition([lng, lat]); // [lng, lat] для 2GIS
+        });
+        
+        console.log("Карта 2GIS успешно инициализирована в настройках");
+      } catch (error) {
+        console.error("Ошибка инициализации карты 2GIS в настройках:", error);
+        setMapInitError(`Ошибка инициализации карты: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      }
+    }
+    
+    initMap().catch(error => {
+      console.error("Неперехваченная ошибка при инициализации карты:", error);
+      setMapInitError(`Неперехваченная ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    });
+    
+    return () => {
+      // Очистка ресурсов при размонтировании компонента
+      if (markerRef.current) {
+        try {
+          markerRef.current.destroy();
+        } catch (e) {
+          console.error("Ошибка при удалении маркера:", e);
+        }
+        markerRef.current = null;
+      }
+      
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.destroy();
+        } catch (e) {
+          console.error("Ошибка при удалении карты:", e);
+        }
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [selectedPosition, zoom]);
+
+  // Обработчик отправки формы
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Валидация входных данных
     if (typeof latitude !== 'number' || typeof longitude !== 'number' || typeof zoom !== 'number') {
       toast({
         title: 'Ошибка',
@@ -58,6 +184,8 @@ export default function MapSettings() {
       return;
     }
     
+    try {
+      // Обновление настроек
     await updateSettings({
       defaultCityName: cityName,
       defaultLatitude: latitude,
@@ -69,26 +197,44 @@ export default function MapSettings() {
       title: 'Успех',
       description: 'Настройки карты успешно обновлены',
     });
+    } catch (error) {
+      console.error("Ошибка обновления настроек:", error);
+      toast({
+        title: 'Ошибка',
+        description: `Не удалось обновить настройки: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`,
+        variant: 'destructive'
+      });
+    }
   };
 
-  function MapEvents() {
-    useMapEvents({
-      click(e) {
-        const { lat, lng } = e.latlng;
-        setLatitude(lat);
-        setLongitude(lng);
-        setSelectedPosition([lat, lng]);
-      },
-    });
-    return null;
-  }
+  // Обработчик изменения координат
+  const handleCoordinateChange = (lat: number | '', lng: number | '') => {
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      setSelectedPosition([lng, lat]); // [lng, lat] для 2GIS
+    }
+  };
+
+  // Обновление позиции на карте при изменении координат в форме
+  useEffect(() => {
+    handleCoordinateChange(latitude, longitude);
+  }, [latitude, longitude]);
 
   if (isLoading && !settings) {
-    return <div>Загрузка настроек...</div>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+        <p className="ml-4 text-gray-600">Загрузка настроек карты...</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <div>Ошибка: {error}</div>;
+    return (
+      <div className="p-6 bg-red-50 border border-red-200 rounded-lg text-red-700">
+        <h3 className="text-lg font-semibold mb-2">Ошибка загрузки настроек</h3>
+        <p>{error}</p>
+      </div>
+    );
   }
 
   return (
@@ -125,6 +271,7 @@ export default function MapSettings() {
                 onChange={(e) => setZoom(e.target.value ? Number(e.target.value) : '')}
                 required
               />
+              <p className="text-xs text-gray-500">Значение от 1 (весь мир) до 20 (максимальное приближение)</p>
             </div>
             
             <div className="space-y-2">
@@ -140,6 +287,7 @@ export default function MapSettings() {
                 onChange={(e) => setLatitude(e.target.value ? Number(e.target.value) : '')}
                 required
               />
+              <p className="text-xs text-gray-500">Значение от -90° до 90°</p>
             </div>
             
             <div className="space-y-2">
@@ -155,25 +303,22 @@ export default function MapSettings() {
                 onChange={(e) => setLongitude(e.target.value ? Number(e.target.value) : '')}
                 required
               />
+              <p className="text-xs text-gray-500">Значение от -180° до 180°</p>
             </div>
           </div>
           
-          <div className="h-[400px] w-full mt-4 rounded overflow-hidden">
-            {selectedPosition && (
-              <MapContainer 
-                center={selectedPosition} 
-                zoom={zoom || 12} 
-                className="h-full w-full"
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                
-                <Marker position={selectedPosition} />
-                <MapEvents />
-              </MapContainer>
+          <div className="h-[400px] w-full mt-4 rounded-lg overflow-hidden border border-gray-200">
+            {mapInitError ? (
+              <div className="flex items-center justify-center h-full bg-red-50 text-red-700 p-4">
+                <p className="text-center">{mapInitError}</p>
+              </div>
+            ) : (
+              <div ref={mapContainerRef} className="h-full w-full" />
             )}
+          </div>
+          
+          <div className="mt-2 text-sm text-gray-500">
+            <p>Кликните по карте, чтобы выбрать новое местоположение.</p>
           </div>
           
           <Button 

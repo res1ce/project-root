@@ -1,34 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AppLayout from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
-import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
+import { load } from '@2gis/mapgl';
 
-// Фикс для иконок Leaflet в Next.js
-const fireIcon = L.icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// API ключ для 2GIS
+const API_KEY = process.env.NEXT_PUBLIC_2GIS_API_KEY || '';
 
-const stationIcon = L.icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// Настройки маркеров (обновленные для 2GIS)
+const FIRE_MARKER_OPTIONS = {
+  icon: 'https://cdn-icons-png.flaticon.com/512/785/785116.png',
+  size: [32, 32],
+  anchor: [16, 32],
+};
+
+const STATION_MARKER_OPTIONS = {
+  icon: 'https://cdn-icons-png.flaticon.com/512/1042/1042363.png',
+  size: [32, 32],
+  anchor: [16, 32],
+};
+
+// Стили для всплывающих окон
+const POPUP_STYLES = `
+  padding: 12px;
+  font-size: 14px;
+  background: white;
+  color: #333;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  max-width: 250px;
+  line-height: 1.4;
+`;
 
 interface Fire {
   id: number;
@@ -80,196 +87,326 @@ export default function FireDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
   const { user } = useAuthStore();
+  
   const [fire, setFire] = useState<Fire | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [fireLevels, setFireLevels] = useState<FireLevel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedLevelId, setSelectedLevelId] = useState<number>(0);
   const [isUpdatingLevel, setIsUpdatingLevel] = useState(false);
   const [isResolvingFire, setIsResolvingFire] = useState(false);
-  const [selectedLevelId, setSelectedLevelId] = useState<number>(0);
+  const [mapError, setMapError] = useState<string | null>(null);
   
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<{[key: string]: any}>({});
+  const activePopupRef = useRef<any>(null);
+
+  // Функция загрузки данных о пожаре
+  const fetchFireDetails = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get(`/fires/${id}`);
+      setFire(response.data);
+      
+      if (response.data.levelId) {
+        setSelectedLevelId(response.data.levelId);
+      }
+    } catch (error) {
+      console.error('Error fetching fire details:', error);
+      setError('Не удалось загрузить данные о пожаре');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Функция загрузки данных об уровнях пожара
+  const fetchFireLevels = async () => {
+    try {
+      const response = await api.get('/fire-levels');
+      setFireLevels(response.data);
+    } catch (error) {
+      console.error('Error fetching fire levels:', error);
+    }
+  };
+  
+  // Загрузка данных при монтировании компонента
   useEffect(() => {
-    const fetchFireDetails = async () => {
+    fetchFireDetails();
+    fetchFireLevels();
+  }, [id]);
+
+  // Функция для закрытия активного попапа
+  const closeActivePopup = () => {
+    if (activePopupRef.current) {
       try {
-        setLoading(true);
+        activePopupRef.current.destroy();
+      } catch (e) {
+        console.error("Ошибка при закрытии всплывающего окна:", e);
+      }
+      activePopupRef.current = null;
+    }
+  };
+
+  // Инициализация карты 2GIS при загрузке данных о пожаре
+  useEffect(() => {
+    if (!mapContainerRef.current || !fire) return;
+    
+    let mapglInstance: any;
+    let mapInstance: any;
+    
+    async function initMap() {
+      try {
+        console.log("Инициализация карты 2GIS для деталей пожара...");
+        setMapError(null);
         
-        // В реальном приложении здесь были бы запросы к API
-        // const fireResponse = await api.get(`/fire/${id}`);
-        // const levelsResponse = await api.get('/fire/level');
+        // Проверка API ключа
+        if (!API_KEY) {
+          const error = "Отсутствует API ключ 2GIS";
+          console.error(error);
+          setMapError(error);
+          return;
+        }
         
-        // Демонстрационные данные
-        const mockFireLevels: FireLevel[] = [
-          { id: 1, name: '1', description: 'Разведка' },
-          { id: 2, name: '2', description: 'Средний пожар' },
-          { id: 3, name: '3', description: 'Крупный пожар' }
-        ];
-        
-        const mockFire: Fire = {
-          id: Number(id),
-          latitude: 55.755814,
-          longitude: 37.617635,
-          address: 'Красная площадь',
-          levelId: 2,
-          level: mockFireLevels[1],
-          status: 'active',
-          createdAt: '2025-04-28T10:30:00Z',
-          updatedAt: '2025-04-28T10:35:00Z',
-          assignedStationId: 1,
-          assignedStation: {
-            id: 1,
-            name: 'Пожарная часть №1',
-            address: 'ул. Ленина, 10',
-            latitude: 55.751244,
-            longitude: 37.618423
-          },
-          dispatchedEngines: [
-            {
-              id: 1,
-              fireId: Number(id),
-              engineId: 101,
-              dispatchedAt: '2025-04-28T10:35:00Z',
-              arrivedAt: '2025-04-28T10:50:00Z',
-              status: 'arrived',
-              engine: {
-                id: 101,
-                type: 'Водонесущая',
-                number: 'А-123',
-                fireStationId: 1
-              }
-            },
-            {
-              id: 2,
-              fireId: Number(id),
-              engineId: 102,
-              dispatchedAt: '2025-04-28T10:35:00Z',
-              arrivedAt: null,
-              status: 'dispatched',
-              engine: {
-                id: 102,
-                type: 'Лестница',
-                number: 'Б-456',
-                fireStationId: 1
-              }
+        // Очищаем предыдущую карту, если она была
+        if (mapInstanceRef.current) {
+          // Закрываем активный попап
+          closeActivePopup();
+          
+          // Удаляем все маркеры
+          Object.values(markersRef.current).forEach(marker => {
+            try {
+              marker.destroy();
+            } catch (e) {
+              console.error("Ошибка при удалении маркера:", e);
             }
-          ]
-        };
+          });
+          markersRef.current = {};
+          
+          try {
+            mapInstanceRef.current.destroy();
+          } catch (e) {
+            console.error("Ошибка при удалении карты:", e);
+          }
+          mapInstanceRef.current = null;
+        }
         
-        setFire(mockFire);
-        setFireLevels(mockFireLevels);
-        setSelectedLevelId(mockFire.levelId);
+        // Загружаем SDK 2GIS
+        mapglInstance = await load();
+        
+        // Проверяем наличие координат пожара
+        if (!fire || typeof fire.longitude !== 'number' || typeof fire.latitude !== 'number') {
+          throw new Error('Некорректные координаты пожара');
+        }
+        
+        console.log("Создание карты с центром:", [fire.longitude, fire.latitude]);
+        
+        // Создаем экземпляр карты
+        mapInstance = new mapglInstance.Map(mapContainerRef.current, {
+          center: [fire.longitude, fire.latitude], // [lng, lat] для 2GIS
+          zoom: 13,
+          key: API_KEY,
+        });
+        
+        mapInstanceRef.current = mapInstance;
+        
+        // Добавляем маркер пожара
+        const fireMarker = new mapglInstance.Marker(mapInstance, {
+          coordinates: [fire.longitude, fire.latitude],
+          icon: FIRE_MARKER_OPTIONS.icon,
+          size: FIRE_MARKER_OPTIONS.size,
+          anchor: FIRE_MARKER_OPTIONS.anchor,
+        });
+        
+        markersRef.current['fire'] = fireMarker;
+        
+        // Добавляем информацию о пожаре при клике на маркер
+        fireMarker.on('click', () => {
+          // Закрываем предыдущий попап
+          closeActivePopup();
+          
+          // Дополнительная проверка на существование fire объекта
+          if (!fire) return;
+        
+          const popup = new mapglInstance.HtmlMarker(mapInstance, {
+            coordinates: [fire.longitude, fire.latitude],
+            html: `
+              <div style="${POPUP_STYLES}">
+                <p style="font-weight: bold; margin: 0 0 8px; color: #d32f2f;">Пожар #${fire.id}</p>
+                <p style="margin: 0 0 5px;">Адрес: ${fire.address}</p>
+                <p style="margin: 0;">Уровень: ${fire.level?.name || ''} - ${fire.level?.description || ''}</p>
+              </div>
+            `,
+            zIndex: 1000
+          });
+          
+          activePopupRef.current = popup;
+        });
+        
+        // Добавляем маркер пожарной части, если назначена
+        if (fire.assignedStation && 
+            typeof fire.assignedStation.longitude === 'number' && 
+            typeof fire.assignedStation.latitude === 'number') {
+          
+          const stationMarker = new mapglInstance.Marker(mapInstance, {
+            coordinates: [fire.assignedStation.longitude, fire.assignedStation.latitude],
+            icon: STATION_MARKER_OPTIONS.icon,
+            size: STATION_MARKER_OPTIONS.size,
+            anchor: STATION_MARKER_OPTIONS.anchor,
+          });
+          
+          markersRef.current['station'] = stationMarker;
+          
+          // Добавляем информацию о части при клике на маркер
+          stationMarker.on('click', () => {
+            // Закрываем предыдущий попап
+            closeActivePopup();
+            
+            // Дополнительная проверка существования fire и assignedStation
+            if (!fire || !fire.assignedStation) return;
+            
+            const popup = new mapglInstance.HtmlMarker(mapInstance, {
+              coordinates: [fire.assignedStation.longitude, fire.assignedStation.latitude],
+              html: `
+                <div style="${POPUP_STYLES}">
+                  <p style="font-weight: bold; margin: 0 0 8px; color: #1976d2;">${fire.assignedStation.name}</p>
+                  <p style="margin: 0;">Адрес: ${fire.assignedStation.address}</p>
+                </div>
+              `,
+              zIndex: 1000
+            });
+            
+            activePopupRef.current = popup;
+          });
+        }
+        
+        // Устанавливаем обработчик события для закрытия попапа при клике по карте
+        mapInstance.on('click', () => {
+          closeActivePopup();
+        });
+        
+        console.log("Карта 2GIS успешно инициализирована для деталей пожара");
       } catch (error) {
-        console.error('Error fetching fire details:', error);
-        toast.error('Ошибка при загрузке данных о пожаре');
-      } finally {
-        setLoading(false);
+        console.error("Ошибка инициализации карты 2GIS для деталей пожара:", error);
+        setMapError(`Ошибка инициализации карты: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      }
+    }
+    
+    initMap().catch(error => {
+      console.error("Неперехваченная ошибка при инициализации карты:", error);
+      setMapError(`Неперехваченная ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    });
+    
+    return () => {
+      // Очистка ресурсов при размонтировании компонента
+      closeActivePopup();
+      
+      if (mapInstanceRef.current) {
+        Object.values(markersRef.current).forEach(marker => {
+          try {
+            marker.destroy();
+          } catch (e) {
+            console.error("Ошибка при удалении маркера:", e);
+      }
+        });
+        markersRef.current = {};
+        
+        try {
+          mapInstanceRef.current.destroy();
+        } catch (e) {
+          console.error("Ошибка при удалении карты:", e);
+    }
+        mapInstanceRef.current = null;
       }
     };
-    
-    if (id) {
-      fetchFireDetails();
-    }
-  }, [id]);
+  }, [fire]);
   
+  // Обработчик обновления уровня пожара
   const handleUpdateLevel = async () => {
-    if (!fire || !selectedLevelId || selectedLevelId === fire.levelId) {
-      return;
-    }
+    if (!selectedLevelId || selectedLevelId === fire?.levelId) return;
     
     try {
       setIsUpdatingLevel(true);
       
-      // В реальном приложении здесь был бы запрос к API
-      // await api.patch(`/fire/${id}`, {
-      //   levelId: selectedLevelId
-      // });
-      
-      // Имитация обновления
-      const selectedLevel = fireLevels.find(level => level.id === selectedLevelId);
-      
-      if (selectedLevel) {
-        setFire({
-          ...fire,
-          levelId: selectedLevelId,
-          level: selectedLevel,
-          updatedAt: new Date().toISOString()
+      await api.patch(`/fires/${id}/level`, {
+        levelId: selectedLevelId
         });
-        toast.success('Уровень пожара обновлен');
-      }
+      
+      toast.success('Уровень пожара успешно обновлен');
+      fetchFireDetails();
     } catch (error) {
       console.error('Error updating fire level:', error);
-      toast.error('Ошибка при обновлении уровня пожара');
+      toast.error('Не удалось обновить уровень пожара');
     } finally {
       setIsUpdatingLevel(false);
     }
   };
   
+  // Обработчик отметки пожара как потушенного
   const handleResolveFire = async () => {
-    if (!fire) {
-      return;
-    }
+    if (!fire) return;
     
     try {
       setIsResolvingFire(true);
       
-      // В реальном приложении здесь был бы запрос к API
-      // await api.patch(`/fire/${id}`, {
-      //   status: 'resolved'
-      // });
-      
-      // Имитация обновления
-      setFire({
-        ...fire,
-        status: 'resolved',
-        updatedAt: new Date().toISOString()
-      });
+      await api.patch(`/fires/${id}/resolve`);
       
       toast.success('Пожар отмечен как потушенный');
-      
-      // Перенаправление на список пожаров через 2 секунды
-      setTimeout(() => {
-        router.push('/fires/list');
-      }, 2000);
+      fetchFireDetails();
     } catch (error) {
       console.error('Error resolving fire:', error);
-      toast.error('Ошибка при изменении статуса пожара');
+      toast.error('Не удалось обновить статус пожара');
     } finally {
       setIsResolvingFire(false);
     }
   };
   
+  // Права на изменение уровня пожара
+  const canUpdateLevel = 
+    (user?.role === 'central_dispatcher') || 
+    (user?.role === 'station_dispatcher' && user.fireStationId === fire?.assignedStationId && fire?.status === 'investigating');
+  
+  // Права на отметку пожара как потушенного
+  const canResolveFire = 
+    (user?.role === 'central_dispatcher') || 
+    (user?.role === 'station_dispatcher' && user.fireStationId === fire?.assignedStationId);
+  
+  // Перевод статуса пожара на русский
   const getFireStatusText = (status: string): string => {
     switch (status) {
       case 'active':
         return 'Активный';
       case 'investigating':
-        return 'Разведка';
+        return 'Исследование';
       case 'dispatched':
         return 'Отправлен';
       case 'resolved':
         return 'Потушен';
       default:
-        return 'Неизвестно';
+        return status;
     }
   };
   
+  // Перевод статуса техники на русский
   const getEngineStatusText = (status: string): string => {
     switch (status) {
-      case 'ready':
-        return 'Готов';
       case 'dispatched':
-        return 'В пути';
+        return 'Отправлена';
       case 'arrived':
-        return 'Прибыл';
+        return 'Прибыла';
       case 'returning':
         return 'Возвращается';
       case 'returned':
-        return 'Вернулся';
+        return 'Вернулась';
       default:
-        return 'Неизвестно';
+        return status;
     }
   };
   
+  // Форматирование даты
   const formatDate = (dateString: string | null): string => {
-    if (!dateString) return '-';
+    if (!dateString) return 'Не указано';
+    
     return new Date(dateString).toLocaleString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
@@ -279,35 +416,46 @@ export default function FireDetailsPage() {
     });
   };
   
-  // Проверка доступа к изменению уровня пожара
-  const canUpdateLevel = user?.role === 'central_dispatcher' || 
-    (user?.role === 'station_dispatcher' && user.fireStationId === fire?.assignedStationId);
-  
-  // Проверка, можно ли отметить пожар как потушенный
-  const canResolveFire = fire?.status !== 'resolved' && 
-    (user?.role === 'central_dispatcher' || 
-      (user?.role === 'station_dispatcher' && user.fireStationId === fire?.assignedStationId));
+  // Индикатор загрузки
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-700 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Загрузка данных о пожаре...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
+  // Основной контент страницы
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              Пожар #{id}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Подробная информация о пожаре
-            </p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">Детали пожара #{id}</h1>
+          <div className="flex space-x-2">
+            <Link 
+              href="/fires/map"
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm"
+            >
+              Назад к карте
+            </Link>
+            <Link 
+              href="/fires/list"
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm"
+            >
+              Список пожаров
+            </Link>
           </div>
-          <Link href="/fires/list" className="text-sm text-blue-600 hover:text-blue-800">
-            ← Вернуться к списку
-          </Link>
         </div>
         
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+        {error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg">
+            <h3 className="text-lg font-semibold mb-2">Ошибка загрузки данных</h3>
+            <p>{error}</p>
           </div>
         ) : fire ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -315,8 +463,7 @@ export default function FireDetailsPage() {
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-white p-6 rounded-lg shadow-md">
                 <h2 className="text-lg font-semibold mb-4">Основная информация</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">Адрес</p>
                     <p className="font-medium">{fire.address}</p>
@@ -390,7 +537,7 @@ export default function FireDetailsPage() {
                 </div>
                 
                 {/* Кнопка для отметки пожара как потушенного */}
-                {canResolveFire && (
+                {canResolveFire && fire.status !== 'resolved' && (
                   <div className="mt-6 pt-4 border-t border-gray-200">
                     <button
                       onClick={handleResolveFire}
@@ -407,45 +554,13 @@ export default function FireDetailsPage() {
               <div className="bg-white p-6 rounded-lg shadow-md">
                 <h2 className="text-lg font-semibold mb-4">Карта</h2>
                 <div className="h-[400px] w-full rounded-md overflow-hidden">
-                  <MapContainer 
-                    center={[fire.latitude, fire.longitude]} 
-                    zoom={13} 
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    
-                    {/* Маркер пожара */}
-                    <Marker 
-                      position={[fire.latitude, fire.longitude]} 
-                      icon={fireIcon}
-                    >
-                      <Popup>
-                        <div>
-                          <strong>Пожар #{fire.id}</strong><br />
-                          Адрес: {fire.address}<br />
-                          Уровень: {fire.level?.name} - {fire.level?.description}
+                  {mapError ? (
+                    <div className="flex items-center justify-center h-full bg-red-50 text-red-700 p-4">
+                      <p className="text-center">{mapError}</p>
                         </div>
-                      </Popup>
-                    </Marker>
-                    
-                    {/* Маркер пожарной части */}
-                    {fire.assignedStation && (
-                      <Marker 
-                        position={[fire.assignedStation.latitude, fire.assignedStation.longitude]} 
-                        icon={stationIcon}
-                      >
-                        <Popup>
-                          <div>
-                            <strong>{fire.assignedStation.name}</strong><br />
-                            Адрес: {fire.assignedStation.address}
-                          </div>
-                        </Popup>
-                      </Marker>
-                    )}
-                  </MapContainer>
+                  ) : (
+                    <div ref={mapContainerRef} className="h-full w-full" />
+                  )}
                 </div>
               </div>
             </div>

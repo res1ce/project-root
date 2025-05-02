@@ -1,25 +1,23 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AppLayout from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
-import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
+import { load } from '@2gis/mapgl';
 
-// Фикс для иконок Leaflet в Next.js
-const icon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// API ключ для 2GIS
+const API_KEY = process.env.NEXT_PUBLIC_2GIS_API_KEY || '';
+
+// Настройки маркера
+const MARKER_OPTIONS = {
+  icon: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  size: [25, 41],
+  anchor: [12, 41],
+};
 
 interface Fire {
   id: number;
@@ -50,46 +48,6 @@ interface FireStation {
   longitude: number;
 }
 
-// Компонент для перемещения маркера
-function DraggableMarker({ 
-  position, 
-  setPosition 
-}: { 
-  position: [number, number], 
-  setPosition: (pos: [number, number]) => void 
-}) {
-  // Обработчик перетаскивания маркера
-  const eventHandlers = {
-    dragend: (e: L.DragEndEvent) => {
-      const marker = e.target;
-      const position = marker.getLatLng();
-      setPosition([position.lat, position.lng]);
-    },
-  };
-
-  // Компонент клика по карте
-  const ClickHandler = () => {
-    useMapEvents({
-      click: (e) => {
-        setPosition([e.latlng.lat, e.latlng.lng]);
-      },
-    });
-    return null;
-  };
-
-  return (
-    <>
-      <ClickHandler />
-      <Marker
-        draggable={true}
-        eventHandlers={eventHandlers}
-        position={position}
-        icon={icon}
-      />
-    </>
-  );
-}
-
 export default function EditFirePage() {
   const { id } = useParams();
   const router = useRouter();
@@ -110,77 +68,44 @@ export default function EditFirePage() {
   const [fireLevels, setFireLevels] = useState<FireLevel[]>([]);
   const [fireStations, setFireStations] = useState<FireStation[]>([]);
   
+  // Ссылки для 2GIS карты
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  
   useEffect(() => {
     const fetchFireData = async () => {
       try {
         setLoading(true);
         
         // В реальном приложении здесь были бы запросы к API
-        // const fireResponse = await api.get(`/fire/${id}`);
-        // const levelsResponse = await api.get('/fire/level');
-        // const stationsResponse = await api.get('/fire-station');
+        const response = await api.get(`/fires/${id}`);
+        const levelsResponse = await api.get('/fire-levels');
+        const stationsResponse = await api.get('/fire-stations');
         
-        // Демонстрационные данные
-        const mockFireLevels: FireLevel[] = [
-          { id: 1, name: '1', description: 'Разведка' },
-          { id: 2, name: '2', description: 'Средний пожар' },
-          { id: 3, name: '3', description: 'Крупный пожар' }
-        ];
-        
-        const mockFireStations: FireStation[] = [
-          { 
-            id: 1, 
-            name: 'Пожарная часть №1', 
-            address: 'ул. Ленина, 10', 
-            latitude: 55.751244, 
-            longitude: 37.618423
-          },
-          { 
-            id: 2, 
-            name: 'Пожарная часть №2', 
-            address: 'ул. Гагарина, 25', 
-            latitude: 55.761244, 
-            longitude: 37.628423
-          },
-          { 
-            id: 3, 
-            name: 'Пожарная часть №3', 
-            address: 'ул. Пушкина, 15', 
-            latitude: 55.741244, 
-            longitude: 37.608423
-          }
-        ];
-        
-        const mockFire: Fire = {
-          id: Number(id),
-          latitude: 55.755814,
-          longitude: 37.617635,
-          address: 'Красная площадь',
-          levelId: 2,
-          level: mockFireLevels[1],
-          status: 'active',
-          assignedStationId: 1
-        };
+        const fire = response.data;
+        const fireLevels = levelsResponse.data;
+        const fireStations = stationsResponse.data;
         
         // Проверка прав доступа
         const isDispatcher = user?.role === 'central_dispatcher' || user?.role === 'station_dispatcher';
         const isStationDispatcherForThisFire = user?.role === 'station_dispatcher' && 
-          user.fireStationId === mockFire.assignedStationId;
+          user.fireStationId === fire.assignedStationId;
           
         if (!isDispatcher || (user?.role === 'station_dispatcher' && !isStationDispatcherForThisFire)) {
           setUnauthorizedAccess(true);
           return;
         }
         
-        setFireLevels(mockFireLevels);
-        setFireStations(mockFireStations);
+        setFireLevels(fireLevels);
+        setFireStations(fireStations);
         
         // Заполнение формы данными
-        setPosition([mockFire.latitude, mockFire.longitude]);
-        setAddress(mockFire.address);
-        setLevelId(mockFire.levelId);
-        setStatus(mockFire.status);
-        setAssignedStationId(mockFire.assignedStationId);
+        setPosition([fire.latitude, fire.longitude]);
+        setAddress(fire.address);
+        setLevelId(fire.levelId);
+        setStatus(fire.status);
+        setAssignedStationId(fire.assignedStationId);
       } catch (error) {
         console.error('Error fetching fire data:', error);
         toast.error('Ошибка при загрузке данных о пожаре');
@@ -195,6 +120,94 @@ export default function EditFirePage() {
     }
   }, [id, user]);
   
+  // Инициализация и обновление карты
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    
+    let mapglInstance: any;
+    let mapInstance: any;
+    
+    async function initMap() {
+      // Очищаем предыдущую карту, если она была
+      if (mapInstanceRef.current) {
+        if (markerRef.current) {
+          markerRef.current.destroy();
+          markerRef.current = null;
+        }
+        mapInstanceRef.current.destroy();
+        mapInstanceRef.current = null;
+      }
+      
+      // Загружаем SDK 2GIS
+      mapglInstance = await load();
+      
+      // Создаем экземпляр карты
+      mapInstance = new mapglInstance.Map(mapContainerRef.current, {
+        center: [position[1], position[0]], // [lng, lat] для 2GIS
+        zoom: 13,
+        key: API_KEY,
+      });
+      
+      mapInstanceRef.current = mapInstance;
+      
+      // Добавляем маркер
+      markerRef.current = new mapglInstance.Marker(mapInstance, {
+        coordinates: [position[1], position[0]],
+        icon: MARKER_OPTIONS.icon,
+        size: MARKER_OPTIONS.size,
+        anchor: MARKER_OPTIONS.anchor,
+        draggable: true,
+      });
+      
+      // Обработчик перетаскивания маркера
+      markerRef.current.on('dragend', (e: any) => {
+        const coordinates = e.target.getCoordinates();
+        setPosition([coordinates[1], coordinates[0]]);
+      });
+      
+      // Обработчик клика по карте
+      mapInstance.on('click', (e: any) => {
+        const coordinates = e.lngLat;
+        
+        // Обновляем маркер
+        if (markerRef.current) {
+          markerRef.current.destroy();
+        }
+        
+        markerRef.current = new mapglInstance.Marker(mapInstance, {
+          coordinates: [coordinates.lng, coordinates.lat],
+          icon: MARKER_OPTIONS.icon,
+          size: MARKER_OPTIONS.size,
+          anchor: MARKER_OPTIONS.anchor,
+          draggable: true,
+        });
+        
+        // Обработчик перетаскивания маркера
+        markerRef.current.on('dragend', (e: any) => {
+          const coordinates = e.target.getCoordinates();
+          setPosition([coordinates[1], coordinates[0]]);
+        });
+        
+        // Обновляем состояние
+        setPosition([coordinates.lat, coordinates.lng]);
+      });
+    }
+    
+    initMap().catch(console.error);
+    
+    return () => {
+      if (markerRef.current) {
+        markerRef.current.destroy();
+        markerRef.current = null;
+      }
+      
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.destroy();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [position[0], position[1]]);
+  
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
@@ -206,23 +219,19 @@ export default function EditFirePage() {
     try {
       setIsSubmitting(true);
       
-      // В реальном приложении здесь был бы запрос к API
-      // await api.put(`/fire/${id}`, {
-      //   latitude: position[0],
-      //   longitude: position[1],
-      //   address,
-      //   levelId,
-      //   status,
-      //   assignedStationId
-      // });
+      await api.put(`/fires/${id}`, {
+        latitude: position[0],
+        longitude: position[1],
+        address,
+        levelId,
+        status,
+        assignedStationId
+      });
       
-      // Имитация успешного обновления
       toast.success('Данные о пожаре успешно обновлены');
       
       // Перенаправление на страницу деталей
-      setTimeout(() => {
-        router.push(`/fires/${id}`);
-      }, 1500);
+      router.push(`/fires/${id}`);
     } catch (error) {
       console.error('Error updating fire:', error);
       toast.error('Ошибка при обновлении данных о пожаре');
@@ -260,127 +269,113 @@ export default function EditFirePage() {
       </AppLayout>
     );
   }
+  
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-700 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Загрузка данных о пожаре...</p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              Редактирование пожара #{id}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Обновите информацию о пожаре
-            </p>
-          </div>
-          <Link href={`/fires/${id}`} className="text-sm text-blue-600 hover:text-blue-800">
-            ← Вернуться к деталям
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">Редактирование пожара #{id}</h1>
+          <Link 
+            href={`/fires/${id}`}
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm"
+          >
+            Вернуться к деталям
           </Link>
         </div>
         
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
-          </div>
-        ) : (
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Карта */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Местоположение
-                </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Кликните по карте или перетащите маркер для изменения местоположения пожара
-                </p>
-                <div className="h-[400px] w-full rounded-md overflow-hidden border border-gray-300">
-                  <MapContainer 
-                    center={position} 
-                    zoom={13} 
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <DraggableMarker position={position} setPosition={setPosition} />
-                  </MapContainer>
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <form onSubmit={handleSubmit}>
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-4">Местоположение пожара</h2>
+              <div className="h-[400px] w-full rounded-md overflow-hidden mb-4">
+                <div ref={mapContainerRef} className="h-full w-full" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Широта</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    value={position[0].toFixed(6)}
+                    readOnly
+                  />
                 </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  Координаты: {position[0].toFixed(6)}, {position[1].toFixed(6)}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Долгота</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    value={position[1].toFixed(6)}
+                    readOnly
+                  />
                 </div>
               </div>
-              
-              {/* Адрес */}
-              <div>
-                <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
-                  Адрес*
-                </label>
-                <input
-                  id="address"
-                  type="text"
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
+                <input 
+                  type="text" 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                 />
               </div>
-              
-              {/* Уровень пожара */}
-              <div>
-                <label htmlFor="level" className="block text-sm font-medium text-gray-700 mb-2">
-                  Уровень пожара*
-                </label>
-                <select
-                  id="level"
-                  value={levelId}
-                  onChange={(e) => setLevelId(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
-                  required
-                >
-                  <option value="">Выберите уровень</option>
-                  {fireLevels.map(level => (
-                    <option key={level.id} value={level.id}>
-                      {level.name} - {level.description}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Статус */}
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-                  Статус*
-                </label>
-                <select
-                  id="status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
-                  required
-                >
-                  <option value="">Выберите статус</option>
-                  {fireStatuses.map(status => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Назначенная пожарная часть */}
-              {user?.role === 'central_dispatcher' && (
+            </div>
+            
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-4">Информация о пожаре</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="station" className="block text-sm font-medium text-gray-700 mb-2">
-                    Пожарная часть
-                  </label>
-                  <select
-                    id="station"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Уровень пожара</label>
+                  <select 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    value={levelId}
+                    onChange={(e) => setLevelId(Number(e.target.value))}
+                    required
+                  >
+                    <option value="">Выберите уровень</option>
+                    {fireLevels.map(level => (
+                      <option key={level.id} value={level.id}>
+                        {level.name} - {level.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Статус</label>
+                  <select 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    required
+                  >
+                    <option value="">Выберите статус</option>
+                    {fireStatuses.map(status => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Назначенная пожарная часть</label>
+                  <select 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     value={assignedStationId || ''}
                     onChange={(e) => setAssignedStationId(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   >
-                    <option value="">Выберите пожарную часть</option>
+                    <option value="">Не назначена</option>
                     {fireStations.map(station => (
                       <option key={station.id} value={station.id}>
                         {station.name} - {station.address}
@@ -388,27 +383,20 @@ export default function EditFirePage() {
                     ))}
                   </select>
                 </div>
-              )}
-              
-              {/* Кнопки */}
-              <div className="flex justify-end space-x-3 pt-2">
-                <Link 
-                  href={`/fires/${id}`}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Отмена
-                </Link>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Сохранение...' : 'Сохранить'}
-                </button>
               </div>
-            </form>
-          </div>
-        )}
+            </div>
+            
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50"
+              >
+                {isSubmitting ? 'Сохранение...' : 'Сохранить изменения'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </AppLayout>
   );
