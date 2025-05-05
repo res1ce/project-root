@@ -32,8 +32,8 @@ let FireStationController = class FireStationController {
             throw new common_1.BadRequestException(e.message);
         }
     }
-    getAll() {
-        return this.fireStationService.getAll();
+    getAll(req) {
+        return this.fireStationService.getAll(req.user.userId, req.user.role);
     }
     getById(id) {
         return this.fireStationService.getById(Number(id));
@@ -56,16 +56,15 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], FireStationController.prototype, "create", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('admin'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(),
+    __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], FireStationController.prototype, "getAll", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('admin'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),

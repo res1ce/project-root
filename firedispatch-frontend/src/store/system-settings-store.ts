@@ -35,7 +35,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
     fetchSettings: async () => {
       set({ isLoading: true, error: null });
       try {
-        const response = await api.get<SystemSettings>('/system-settings');
+        const response = await api.get<SystemSettings>('/api/system-settings');
         set({ settings: response.data, isLoading: false });
       } catch (error: any) {
         set({
@@ -48,7 +48,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
     updateSettings: async (data: Partial<SystemSettings>) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await api.put<SystemSettings>('/system-settings', data);
+        const response = await api.put<SystemSettings>('/api/system-settings', data);
         set({ settings: response.data, isLoading: false });
       } catch (error: any) {
         set({

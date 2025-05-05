@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import AppLayout from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import api from '@/lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '@/components/ui/toast';
 import Link from 'next/link';
 import { load } from '@2gis/mapgl';
 
@@ -39,27 +39,45 @@ const POPUP_STYLES = `
 
 interface Fire {
   id: number;
-  latitude: number;
-  longitude: number;
-  address: string;
+  latitude?: number;
+  longitude?: number;
+  location?: [number, number]; // [longitude, latitude]
+  address?: string;
   levelId: number;
   level?: {
     id: number;
     name: string;
     description: string;
   };
+  // Новые поля от бэкенда
+  fireLevel?: {
+    id: number;
+    level: number;
+    name: string;
+    description?: string;
+  };
   status: string;
   createdAt: string;
   updatedAt: string;
-  assignedStationId: number | null;
+  assignedStationId?: number | null;
   assignedStation?: {
     id: number;
     name: string;
-    address: string;
-    latitude: number;
-    longitude: number;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
   };
-  dispatchedEngines: DispatchedEngine[];
+  // Новые поля от бэкенда
+  fireStation?: {
+    id: number;
+    name: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  dispatchedEngines?: DispatchedEngine[];
+  // Другие поля для совместимости
+  readableStatus?: string;
 }
 
 interface DispatchedEngine {
@@ -79,9 +97,52 @@ interface DispatchedEngine {
 
 interface FireLevel {
   id: number;
+  level: number;
   name: string;
   description: string;
 }
+
+// Функция для получения широты и долготы из объекта Fire
+const getFireCoordinates = (fire: Fire): [number, number] => {
+  if (fire.latitude !== undefined && fire.longitude !== undefined) {
+    return [fire.latitude, fire.longitude];
+  } else if (fire.location) {
+    // В location формат [lng, lat]
+    return [fire.location[1], fire.location[0]];
+  }
+  // Значение по умолчанию
+  return [52.05, 113.47]; // Координаты центра Читы
+};
+
+// Функция для получения названия уровня пожара
+const getFireLevelName = (fire: Fire): string => {
+  if (fire.level?.name) {
+    return `${fire.level.name} ${fire.level.description ? `- ${fire.level.description}` : ''}`;
+  } else if (fire.fireLevel?.name) {
+    return `${fire.fireLevel.level} ${fire.fireLevel.name ? `- ${fire.fireLevel.name}` : ''}`;
+  }
+  return `Уровень ${fire.levelId}`;
+};
+
+// Функция для получения имени станции
+const getFireStationName = (fire: Fire): string => {
+  if (fire.assignedStation?.name) {
+    return fire.assignedStation.name;
+  } else if (fire.fireStation?.name) {
+    return fire.fireStation.name;
+  }
+  return fire.assignedStationId ? `ID станции: ${fire.assignedStationId}` : 'Не назначена';
+};
+
+// Функция для получения координат станции
+const getStationCoordinates = (fire: Fire): [number, number] | null => {
+  if (fire.assignedStation?.latitude !== undefined && fire.assignedStation?.longitude !== undefined) {
+    return [fire.assignedStation.latitude, fire.assignedStation.longitude];
+  } else if (fire.fireStation?.latitude !== undefined && fire.fireStation?.longitude !== undefined) {
+    return [fire.fireStation.latitude, fire.fireStation.longitude];
+  }
+  return null;
+};
 
 export default function FireDetailsPage() {
   const { id } = useParams();
@@ -102,28 +163,44 @@ export default function FireDetailsPage() {
   const markersRef = useRef<{[key: string]: any}>({});
   const activePopupRef = useRef<any>(null);
 
-  // Функция загрузки данных о пожаре
-  const fetchFireDetails = async () => {
-    try {
+  // Загружаем данные о пожаре
+  useEffect(() => {
+    const fetchFireDetails = async () => {
       setIsLoading(true);
-      const response = await api.get(`/fires/${id}`);
-      setFire(response.data);
       
-      if (response.data.levelId) {
-        setSelectedLevelId(response.data.levelId);
+      try {
+        // Получаем детали пожара
+        const response = await api.get(`/api/fire/${id}`);
+        setFire(response.data);
+        
+        // Получаем доступные уровни пожара для выбора
+        const levelsResponse = await api.get('/api/fire-level');
+        setFireLevels(levelsResponse.data);
+        
+        // Устанавливаем уровень пожара для селекта
+        if (response.data.levelId) {
+          setSelectedLevelId(response.data.levelId);
+        }
+      } catch (error: any) {
+        console.error('Ошибка при загрузке деталей пожара:', error);
+        toast({ 
+          title: `Ошибка при загрузке деталей пожара: ${error.message || 'Неизвестная ошибка'}`,
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching fire details:', error);
-      setError('Не удалось загрузить данные о пожаре');
-    } finally {
-      setIsLoading(false);
+    };
+    
+    if (id) {
+      fetchFireDetails();
     }
-  };
+  }, [id]);
   
   // Функция загрузки данных об уровнях пожара
   const fetchFireLevels = async () => {
     try {
-      const response = await api.get('/fire-levels');
+      const response = await api.get('/api/fire-level');
       setFireLevels(response.data);
     } catch (error) {
       console.error('Error fetching fire levels:', error);
@@ -132,9 +209,8 @@ export default function FireDetailsPage() {
   
   // Загрузка данных при монтировании компонента
   useEffect(() => {
-    fetchFireDetails();
     fetchFireLevels();
-  }, [id]);
+  }, []);
 
   // Функция для закрытия активного попапа
   const closeActivePopup = () => {
@@ -325,18 +401,29 @@ export default function FireDetailsPage() {
   const handleUpdateLevel = async () => {
     if (!selectedLevelId || selectedLevelId === fire?.levelId) return;
     
+    // Найдем выбранный уровень пожара в списке
+    const selectedLevel = fireLevels.find(level => level.id === selectedLevelId);
+    if (!selectedLevel) return;
+    
     try {
       setIsUpdatingLevel(true);
       
-      await api.patch(`/fires/${id}/level`, {
-        levelId: selectedLevelId
-        });
+      await api.put(`/api/fire/${id}/level`, {
+        newLevel: selectedLevelId
+      });
       
-      toast.success('Уровень пожара успешно обновлен');
-      fetchFireDetails();
+      toast({ 
+        title: 'Уровень пожара успешно обновлен',
+        variant: 'success'
+      });
+      // Перезагружаем страницу или детали пожара
+      window.location.reload();
     } catch (error) {
       console.error('Error updating fire level:', error);
-      toast.error('Не удалось обновить уровень пожара');
+      toast({ 
+        title: 'Не удалось обновить уровень пожара',
+        variant: 'destructive'
+      });
     } finally {
       setIsUpdatingLevel(false);
     }
@@ -349,13 +436,20 @@ export default function FireDetailsPage() {
     try {
       setIsResolvingFire(true);
       
-      await api.patch(`/fires/${id}/resolve`);
+      await api.patch(`/api/fire/${id}/resolve`);
       
-      toast.success('Пожар отмечен как потушенный');
-      fetchFireDetails();
+      toast({ 
+        title: 'Пожар отмечен как потушенный',
+        variant: 'success'
+      });
+      // Перезагружаем страницу или детали пожара
+      window.location.reload();
     } catch (error) {
       console.error('Error resolving fire:', error);
-      toast.error('Не удалось обновить статус пожара');
+      toast({ 
+        title: 'Не удалось обновить статус пожара',
+        variant: 'destructive'
+      });
     } finally {
       setIsResolvingFire(false);
     }
@@ -364,7 +458,7 @@ export default function FireDetailsPage() {
   // Права на изменение уровня пожара
   const canUpdateLevel = 
     (user?.role === 'central_dispatcher') || 
-    (user?.role === 'station_dispatcher' && user.fireStationId === fire?.assignedStationId && fire?.status === 'investigating');
+    (user?.role === 'station_dispatcher' && user.fireStationId === fire?.assignedStationId && fire?.status === 'PENDING');
   
   // Права на отметку пожара как потушенного
   const canResolveFire = 
@@ -374,14 +468,14 @@ export default function FireDetailsPage() {
   // Перевод статуса пожара на русский
   const getFireStatusText = (status: string): string => {
     switch (status) {
-      case 'active':
-        return 'Активный';
-      case 'investigating':
-        return 'Исследование';
-      case 'dispatched':
-        return 'Отправлен';
-      case 'resolved':
+      case 'PENDING':
+        return 'Ожидает обработки';
+      case 'IN_PROGRESS':
+        return 'В процессе тушения';
+      case 'RESOLVED':
         return 'Потушен';
+      case 'CANCELLED':
+        return 'Отменен';
       default:
         return status;
     }
@@ -471,16 +565,17 @@ export default function FireDetailsPage() {
                   <div>
                     <p className="text-sm text-gray-500">Координаты</p>
                     <p className="font-medium">
-                      {fire.latitude.toFixed(6)}, {fire.longitude.toFixed(6)}
+                      {fire.latitude?.toFixed(6)}, {fire.longitude?.toFixed(6)}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Статус</p>
                     <div className="font-medium">
                       <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                        fire.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                        fire.status === 'investigating' ? 'bg-yellow-100 text-yellow-800' :
-                        fire.status === 'dispatched' ? 'bg-blue-100 text-blue-800' :
+                        fire.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
+                        fire.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                        fire.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                        fire.status === 'CANCELLED' ? 'bg-gray-100 text-gray-800' :
                         'bg-red-100 text-red-800'
                       }`}>
                         {getFireStatusText(fire.status)}
@@ -497,7 +592,7 @@ export default function FireDetailsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Назначенная часть</p>
-                    <p className="font-medium">{fire.assignedStation?.name || 'Не назначена'}</p>
+                    <p className="font-medium">{getFireStationName(fire)}</p>
                   </div>
                 </div>
                 
@@ -507,11 +602,11 @@ export default function FireDetailsPage() {
                     <div>
                       <p className="text-sm text-gray-500">Уровень пожара</p>
                       <p className="font-medium">
-                        {fire.level ? `${fire.level.name} - ${fire.level.description}` : 'Не указан'}
+                        {getFireLevelName(fire)}
                       </p>
                     </div>
                     
-                    {canUpdateLevel && fire.status !== 'resolved' && (
+                    {canUpdateLevel && fire.status !== 'RESOLVED' && fire.status !== 'CANCELLED' && (
                       <div className="flex space-x-2">
                         <select
                           value={selectedLevelId}
@@ -537,7 +632,7 @@ export default function FireDetailsPage() {
                 </div>
                 
                 {/* Кнопка для отметки пожара как потушенного */}
-                {canResolveFire && fire.status !== 'resolved' && (
+                {canResolveFire && fire.status !== 'RESOLVED' && fire.status !== 'CANCELLED' && (
                   <div className="mt-6 pt-4 border-t border-gray-200">
                     <button
                       onClick={handleResolveFire}
@@ -570,9 +665,9 @@ export default function FireDetailsPage() {
               <div className="bg-white p-6 rounded-lg shadow-md h-full">
                 <h2 className="text-lg font-semibold mb-4">Техника на пожаре</h2>
                 
-                {fire.dispatchedEngines.length > 0 ? (
+                {fire.dispatchedEngines && fire.dispatchedEngines.length > 0 ? (
                   <div className="space-y-4">
-                    {fire.dispatchedEngines.map(dispatch => (
+                    {fire.dispatchedEngines?.map(dispatch => (
                       <div 
                         key={dispatch.id}
                         className="p-3 border border-gray-200 rounded-md"
@@ -601,9 +696,12 @@ export default function FireDetailsPage() {
                       </div>
                     ))}
                     
-                    {user?.role === 'station_dispatcher' && user.fireStationId === fire.assignedStationId && fire.status !== 'resolved' && (
+                    {user?.role === 'station_dispatcher' && user.fireStationId === fire.assignedStationId && fire.status !== 'RESOLVED' && fire.status !== 'CANCELLED' && (
                       <button
-                        onClick={() => toast.info('Функция отправки дополнительной техники в разработке')}
+                        onClick={() => toast({ 
+                          title: 'Функция отправки дополнительной техники в разработке',
+                          variant: 'default'
+                        })}
                         className="w-full mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium"
                       >
                         Отправить дополнительную технику
@@ -614,10 +712,13 @@ export default function FireDetailsPage() {
                   <div className="text-center py-6 text-gray-500">
                     Техника не отправлена
                     
-                    {user?.role === 'station_dispatcher' && user.fireStationId === fire.assignedStationId && fire.status !== 'resolved' && (
+                    {user?.role === 'station_dispatcher' && user.fireStationId === fire.assignedStationId && fire.status !== 'RESOLVED' && fire.status !== 'CANCELLED' && (
                       <div className="mt-4">
                         <button
-                          onClick={() => toast.info('Функция отправки техники в разработке')}
+                          onClick={() => toast({ 
+                            title: 'Функция отправки техники в разработке',
+                            variant: 'default'
+                          })}
                           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium"
                         >
                           Отправить технику

@@ -13,13 +13,14 @@ const fire_service_1 = require("./fire.service");
 const fire_events_gateway_1 = require("./fire-events.gateway");
 const user_module_1 = require("../user/user.module");
 const prisma_module_1 = require("../prisma/prisma.module");
+const fire_level_controller_1 = require("./fire-level.controller");
 let FireModule = class FireModule {
 };
 exports.FireModule = FireModule;
 exports.FireModule = FireModule = __decorate([
     (0, common_1.Module)({
         imports: [user_module_1.UserModule, prisma_module_1.PrismaModule],
-        controllers: [fire_controller_1.FireController],
+        controllers: [fire_controller_1.FireController, fire_level_controller_1.FireLevelController],
         providers: [fire_service_1.FireService, fire_events_gateway_1.FireEventsGateway],
         exports: [fire_service_1.FireService, fire_events_gateway_1.FireEventsGateway]
     })

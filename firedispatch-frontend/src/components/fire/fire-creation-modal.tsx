@@ -1,14 +1,69 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import React, { useState, useEffect } from 'react';
+// Удаляем неиспользуемые импорты
+// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+// import { Button } from '@/components/ui/button';
 import { useFireStore } from '@/store/fire-store';
 import { FireLevel } from '@/types';
-import { Select } from '@/components/ui/select';
-import { toast } from 'react-toastify';
+import { toast } from '@/components/ui/toast';
+
+// Создаем собственные базовые компоненты для уменьшения зависимостей
+const Label = ({ htmlFor, children }: { htmlFor: string, children: React.ReactNode }) => (
+  <label 
+    htmlFor={htmlFor} 
+    className="block text-sm font-medium text-gray-700"
+  >
+    {children}
+  </label>
+);
+
+// Определяем собственный компонент Input для страховки
+const CustomInput = ({ 
+  id, 
+  value, 
+  onChange, 
+  disabled = false, 
+  placeholder = '', 
+  className = '',
+  type = 'text'
+}: {
+  id: string;
+  value: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
+  type?: string;
+}) => (
+  <input
+    id={id}
+    type={type}
+    value={value}
+    onChange={onChange}
+    disabled={disabled}
+    placeholder={placeholder}
+    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 ${className}`}
+  />
+);
+
+// Добавляем явный компонент Select для случая, если он не импортирован
+const Select = ({ id, value, onChange, children, className = '' }: {
+  id: string;
+  value: any;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <select
+    id={id}
+    value={value}
+    onChange={onChange}
+    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 ${className}`}
+  >
+    {children}
+  </select>
+);
 
 interface FireCreationModalProps {
   isOpen: boolean;
@@ -53,17 +108,40 @@ export function FireCreationModal({
   const [fireAddress, setFireAddress] = useState(address);
   const [fireLevelId, setFireLevelId] = useState<number>(0);
   const [fireDescription, setFireDescription] = useState('');
+  const [isLocationValid, setIsLocationValid] = useState(true);
+  
+  // Проверяем валидность местоположения при первой загрузке и изменениях
+  useEffect(() => {
+    const valid = location && 
+      Array.isArray(location) && 
+      location.length >= 2 && 
+      typeof location[0] === 'number' && 
+      typeof location[1] === 'number' && 
+      !isNaN(location[0]) && 
+      !isNaN(location[1]);
+    
+    setIsLocationValid(!!valid);
+    
+    if (!valid && isOpen) {
+      console.warn('[DEBUG] Невалидное местоположение в FireCreationModal:', location);
+    }
+  }, [location, isOpen]);
   
   // Load fire levels if needed
   useEffect(() => {
-    if (isOpen && levels.length === 0) {
+    if (isOpen && (!levels || levels.length === 0)) {
       loadFireLevels();
     }
     
     // Reset form when modal opens
     if (isOpen) {
       setFireAddress(address || '');
-      setFireLevelId(levels.length > 0 ? levels[0].id : 0);
+      // Устанавливаем уровень пожара по умолчанию только если есть доступные уровни
+      if (levels && levels.length > 0) {
+        setFireLevelId(levels[0].id);
+      } else {
+        setFireLevelId(0);
+      }
       setFireDescription('');
     }
   }, [isOpen, address, levels, loadFireLevels]);
@@ -71,18 +149,30 @@ export function FireCreationModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!location) {
-      toast.error('Местоположение пожара не выбрано');
+    if (!isLocationValid || !location) {
+      toast({
+        title: 'Ошибка',
+        description: 'Местоположение пожара не выбрано или некорректно',
+        variant: 'destructive'
+      });
       return;
     }
     
     if (!fireAddress.trim()) {
-      toast.error('Введите адрес пожара');
+      toast({
+        title: 'Ошибка',
+        description: 'Введите адрес пожара',
+        variant: 'destructive'
+      });
       return;
     }
     
     if (!fireLevelId) {
-      toast.error('Выберите уровень пожара');
+      toast({
+        title: 'Ошибка',
+        description: 'Выберите уровень пожара',
+        variant: 'destructive'
+      });
       return;
     }
     
@@ -95,15 +185,41 @@ export function FireCreationModal({
         description: fireDescription || undefined
       });
       
-      toast.success('Пожар успешно зарегистрирован');
+      toast({
+        title: 'Успешно',
+        description: 'Пожар успешно зарегистрирован',
+        variant: 'success'
+      });
       onClose();
       if (onCreated) {
         onCreated();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating fire:', error);
-      toast.error('Ошибка при регистрации пожара');
+      
+      // Более информативное сообщение об ошибке
+      if (error.response?.data?.message) {
+        toast({
+          title: 'Ошибка',
+          description: `${error.response.data.message}`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: 'Ошибка при регистрации пожара',
+          variant: 'destructive'
+        });
+      }
     }
+  };
+  
+  // Безопасное отображение координат
+  const renderCoordinate = (value: any): string => {
+    if (typeof value === 'number' && !isNaN(value)) {
+      return value.toFixed(6);
+    }
+    return '';
   };
   
   return isOpen ? (
@@ -130,25 +246,33 @@ export function FireCreationModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="latitude">Широта</Label>
-              <Input 
+              <CustomInput 
                 id="latitude" 
-                value={location && Array.isArray(location) && location.length >= 2 && typeof location[0] === 'number' ? location[0].toFixed(6) : ''} 
+                value={location && isLocationValid ? renderCoordinate(location[0]) : ''} 
                 disabled 
+                className={!isLocationValid ? 'border-red-500' : ''}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="longitude">Долгота</Label>
-              <Input 
+              <CustomInput 
                 id="longitude" 
-                value={location && Array.isArray(location) && location.length >= 2 && typeof location[1] === 'number' ? location[1].toFixed(6) : ''} 
+                value={location && isLocationValid ? renderCoordinate(location[1]) : ''} 
                 disabled 
+                className={!isLocationValid ? 'border-red-500' : ''}
               />
             </div>
           </div>
 
+          {!isLocationValid && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-2 text-sm">
+              Некорректные координаты. Пожалуйста, выберите местоположение на карте снова.
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="address">Адрес</Label>
-            <Input
+            <CustomInput
               id="address"
               value={fireAddress}
               onChange={(e) => setFireAddress(e.target.value)}
@@ -164,11 +288,15 @@ export function FireCreationModal({
               onChange={(e) => setFireLevelId(Number(e.target.value))}
             >
               <option value="">Выберите уровень</option>
-              {levels.map((level) => (
-                <option key={level.id} value={level.id}>
-                  {level.name}
-                </option>
-              ))}
+              {levels && levels.length > 0 ? (
+                levels.map((level) => (
+                  <option key={level.id} value={level.id}>
+                    {level.name}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>Загрузка уровней...</option>
+              )}
             </Select>
           </div>
 
@@ -179,20 +307,44 @@ export function FireCreationModal({
               className="w-full min-h-[100px] px-3 py-2 border rounded-md"
               value={fireDescription}
               onChange={(e) => setFireDescription(e.target.value)}
-              placeholder="Введите описание ситуации"
+              placeholder="Дополнительная информация о пожаре"
             />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={onClose}>
+          <button 
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            onClick={onClose} 
+            disabled={isLoading}
+          >
+            Отмена
+          </button>
+          <button
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            onClick={handleSubmit}
+            disabled={isLoading || !isLocationValid}
+          >
+            {isLoading ? 'Регистрация...' : 'Зарегистрировать'}
+          </button>
+        </div>
+
+        {/* Альтернативный вариант с Button из UI библиотеки (закомментирован) */}
+        {/* <div className="flex justify-end gap-2 mt-6">
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Отмена
           </Button>
-          <Button onClick={handleSubmit}>
-            Зарегистрировать
+          <Button
+            onClick={handleSubmit}
+            disabled={isLoading || !isLocationValid}
+          >
+            {isLoading ? 'Регистрация...' : 'Зарегистрировать'}
           </Button>
-        </div>
+        </div> */}
       </div>
     </div>
   ) : null;
-} 
+}
+
+// Добавляем дефолтный экспорт в дополнение к именованному
+export default FireCreationModal; 

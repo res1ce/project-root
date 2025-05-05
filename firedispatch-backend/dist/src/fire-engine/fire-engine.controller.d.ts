@@ -9,68 +9,68 @@ export declare class FireEngineController {
     constructor(fireEngineService: FireEngineService);
     create(dto: CreateFireEngineDto, req: RequestWithUser): Promise<{
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     }>;
     getAll(req: RequestWithUser): Promise<({
         fireStation: {
             id: number;
-            name: string;
-            createdAt: Date;
             updatedAt: Date;
+            name: string;
             address: string;
             latitude: number;
             longitude: number;
+            createdAt: Date;
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     })[]>;
     getById(id: string): Promise<({
         fireStation: {
             id: number;
-            name: string;
-            createdAt: Date;
             updatedAt: Date;
+            name: string;
             address: string;
             latitude: number;
             longitude: number;
+            createdAt: Date;
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     }) | null>;
     update(id: string, dto: CreateFireEngineDto, req: RequestWithUser): Promise<{
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     }>;
     delete(id: string, req: RequestWithUser): Promise<{
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     }>;
 }
 export {};

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -43,5 +43,55 @@ export class UserService {
 
   async countUsers() {
     return this.prisma.user.count();
+  }
+  
+  async getAllUsers() {
+    return this.prisma.user.findMany({
+      include: {
+        fireStation: true,
+      },
+      orderBy: {
+        id: 'asc',
+      }
+    });
+  }
+  
+  async updateUser(id: number, dto: any) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`Пользователь с ID ${id} не найден`);
+    }
+    
+    // Подготавливаем данные для обновления
+    const data: any = {
+      username: dto.username,
+      role: dto.roleId ? dto.roleId : undefined,
+      fireStationId: dto.fireStationId,
+      name: dto.name,
+    };
+    
+    // Если передан пароль, хешируем его
+    if (dto.password) {
+      data.password = await bcrypt.hash(dto.password, 10);
+    }
+    
+    return this.prisma.user.update({
+      where: { id },
+      data,
+      include: {
+        fireStation: true,
+      }
+    });
+  }
+  
+  async deleteUser(id: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`Пользователь с ID ${id} не найден`);
+    }
+    
+    return this.prisma.user.delete({
+      where: { id }
+    });
   }
 }

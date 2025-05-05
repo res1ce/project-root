@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFireEngineDto } from './dto/create-fire-engine.dto';
+import { VehicleType } from '@prisma/client';
 
 @Injectable()
 export class FireEngineService {
@@ -62,5 +63,32 @@ export class FireEngineService {
 
   async delete(id: number) {
     return this.prisma.vehicle.delete({ where: { id } });
+  }
+
+  async getAllEngineTypes() {
+    const enumValues = Object.values(VehicleType);
+    
+    return enumValues.map((type, index) => ({
+      id: index + 1,
+      name: type,
+      description: this.getVehicleTypeDescription(type)
+    }));
+  }
+  
+  private getVehicleTypeDescription(type: VehicleType): string {
+    switch (type) {
+      case VehicleType.FIRE_TRUCK:
+        return 'Пожарная машина';
+      case VehicleType.LADDER_TRUCK:
+        return 'Пожарная автолестница';
+      case VehicleType.RESCUE_VEHICLE:
+        return 'Спасательный автомобиль';
+      case VehicleType.WATER_TANKER:
+        return 'Автоцистерна';
+      case VehicleType.COMMAND_VEHICLE:
+        return 'Штабной автомобиль';
+      default:
+        return 'Неизвестный тип';
+    }
   }
 }

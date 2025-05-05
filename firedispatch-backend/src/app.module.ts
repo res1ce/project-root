@@ -8,6 +8,8 @@ import { FireModule } from './fire/fire.module';
 import { ReportModule } from './report/report.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { EngineTypeModule } from './engine-type/engine-type.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -24,6 +26,8 @@ import configuration from './config/configuration';
     ReportModule,
     WebsocketModule,
     SystemSettingsModule,
+    DashboardModule,
+    EngineTypeModule,
   ],
 })
 export class AppModule {}

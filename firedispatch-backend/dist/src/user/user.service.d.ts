@@ -6,60 +6,110 @@ export declare class UserService {
     findByUsername(username: string): Promise<({
         fireStation: {
             id: number;
-            name: string;
-            createdAt: Date;
             updatedAt: Date;
+            name: string;
             address: string;
             latitude: number;
             longitude: number;
+            createdAt: Date;
         } | null;
         reports: {
             id: number;
-            createdAt: Date;
             updatedAt: Date;
-            userId: number;
+            createdAt: Date;
             fireIncidentId: number;
+            userId: number;
             content: string;
         }[];
     } & {
         id: number;
+        updatedAt: Date;
         name: string;
         createdAt: Date;
-        updatedAt: Date;
+        fireStationId: number | null;
         username: string;
         password: string;
         role: import(".prisma/client").$Enums.UserRole;
-        fireStationId: number | null;
     }) | null>;
     findById(id: number): Promise<({
         fireStation: {
             id: number;
-            name: string;
-            createdAt: Date;
             updatedAt: Date;
+            name: string;
             address: string;
             latitude: number;
             longitude: number;
+            createdAt: Date;
         } | null;
     } & {
         id: number;
+        updatedAt: Date;
         name: string;
         createdAt: Date;
-        updatedAt: Date;
+        fireStationId: number | null;
         username: string;
         password: string;
         role: import(".prisma/client").$Enums.UserRole;
-        fireStationId: number | null;
     }) | null>;
     createUser(dto: CreateUserDto): Promise<{
         id: number;
+        updatedAt: Date;
         name: string;
         createdAt: Date;
-        updatedAt: Date;
+        fireStationId: number | null;
         username: string;
         password: string;
         role: import(".prisma/client").$Enums.UserRole;
-        fireStationId: number | null;
     }>;
     countUsers(): Promise<number>;
+    getAllUsers(): Promise<({
+        fireStation: {
+            id: number;
+            updatedAt: Date;
+            name: string;
+            address: string;
+            latitude: number;
+            longitude: number;
+            createdAt: Date;
+        } | null;
+    } & {
+        id: number;
+        updatedAt: Date;
+        name: string;
+        createdAt: Date;
+        fireStationId: number | null;
+        username: string;
+        password: string;
+        role: import(".prisma/client").$Enums.UserRole;
+    })[]>;
+    updateUser(id: number, dto: any): Promise<{
+        fireStation: {
+            id: number;
+            updatedAt: Date;
+            name: string;
+            address: string;
+            latitude: number;
+            longitude: number;
+            createdAt: Date;
+        } | null;
+    } & {
+        id: number;
+        updatedAt: Date;
+        name: string;
+        createdAt: Date;
+        fireStationId: number | null;
+        username: string;
+        password: string;
+        role: import(".prisma/client").$Enums.UserRole;
+    }>;
+    deleteUser(id: number): Promise<{
+        id: number;
+        updatedAt: Date;
+        name: string;
+        createdAt: Date;
+        fireStationId: number | null;
+        username: string;
+        password: string;
+        role: import(".prisma/client").$Enums.UserRole;
+    }>;
 }

@@ -4,8 +4,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import Image from 'next/image';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from '@/components/ui/toast';
 import ErrorBoundary from '@/components/error/error-boundary';
 
 export default function LoginPageContainer() {
@@ -33,14 +32,22 @@ function LoginPage() {
   useEffect(() => {
     // Показываем ошибку входа, если она есть
     if (loginError) {
-      toast.error(loginError);
+      toast({
+        title: 'Ошибка входа',
+        description: loginError,
+        variant: 'destructive'
+      });
     }
   }, [loginError]);
 
   useEffect(() => {
     // Показываем локальную ошибку, если она есть
     if (localError) {
-      toast.error(localError);
+      toast({
+        title: 'Ошибка',
+        description: localError,
+        variant: 'destructive'
+      });
       setLocalError(null);
     }
   }, [localError]);
@@ -65,9 +72,8 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col justify-center items-center p-4">
-      <ToastContainer position="top-right" autoClose={5000} />
-      <div className="w-full max-w-md bg-white rounded-lg shadow-md p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
         <div className="flex justify-center mb-6">
           <Image 
             src="/images/logo.png" 

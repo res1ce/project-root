@@ -132,8 +132,53 @@ let FireService = class FireService {
             assignedVehicles
         };
     }
-    async getAll() {
-        return this.prisma.fireIncident.findMany({
+    getReadableStatus(status) {
+        const statusMap = {
+            [client_1.IncidentStatus.PENDING]: 'Ожидает обработки',
+            [client_1.IncidentStatus.IN_PROGRESS]: 'В процессе тушения',
+            [client_1.IncidentStatus.RESOLVED]: 'Потушен',
+            [client_1.IncidentStatus.CANCELLED]: 'Отменен'
+        };
+        return statusMap[status] || status;
+    }
+    async getAll(userId, userRole) {
+        console.log(`[DEBUG] FireService.getAll: запрос с userId=${userId}, userRole=${userRole}`);
+        const isStationDispatcher = userRole === client_1.UserRole.STATION_DISPATCHER ||
+            userRole === 'station_dispatcher' ||
+            userRole === 'STATION_DISPATCHER';
+        if (userId && isStationDispatcher) {
+            console.log(`[DEBUG] FireService.getAll: пользователь - диспетчер станции`);
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: { fireStationId: true }
+            });
+            console.log(`[DEBUG] FireService.getAll: fireStationId пользователя = ${user?.fireStationId}`);
+            if (!user?.fireStationId) {
+                throw new common_1.BadRequestException('Пользователь не привязан к пожарной части');
+            }
+            const fires = await this.prisma.fireIncident.findMany({
+                where: { fireStationId: user.fireStationId },
+                include: {
+                    reportedBy: {
+                        select: { id: true, name: true, role: true }
+                    },
+                    assignedTo: {
+                        select: { id: true, name: true, role: true }
+                    },
+                    fireStation: true,
+                    vehicles: true,
+                    reports: true,
+                    fireLevel: true
+                }
+            });
+            console.log(`[DEBUG] FireService.getAll: найдено ${fires.length} пожаров для части ${user.fireStationId}`);
+            return fires.map(fire => ({
+                ...fire,
+                readableStatus: this.getReadableStatus(fire.status)
+            }));
+        }
+        console.log(`[DEBUG] FireService.getAll: пользователь - центральный диспетчер или администратор`);
+        const fires = await this.prisma.fireIncident.findMany({
             include: {
                 reportedBy: {
                     select: { id: true, name: true, role: true }
@@ -147,12 +192,17 @@ let FireService = class FireService {
                 fireLevel: true
             }
         });
+        console.log(`[DEBUG] FireService.getAll: найдено всего ${fires.length} пожаров`);
+        return fires.map(fire => ({
+            ...fire,
+            readableStatus: this.getReadableStatus(fire.status)
+        }));
     }
     async getById(id) {
         const fireId = Number(id);
         if (!fireId || isNaN(fireId))
             throw new common_1.BadRequestException('Некорректный id');
-        return this.prisma.fireIncident.findUnique({
+        const fire = await this.prisma.fireIncident.findUnique({
             where: { id: fireId },
             include: {
                 reportedBy: {
@@ -171,6 +221,12 @@ let FireService = class FireService {
                 }
             }
         });
+        if (!fire)
+            return null;
+        return {
+            ...fire,
+            readableStatus: this.getReadableStatus(fire.status)
+        };
     }
     async update(id, dto) {
         const fireId = Number(id);
@@ -187,10 +243,10 @@ let FireService = class FireService {
         }
         if (dto.levelId) {
             const fireLevel = await this.prisma.fireLevel.findUnique({
-                where: { level: dto.levelId }
+                where: { id: dto.levelId }
             });
             if (!fireLevel) {
-                throw new common_1.NotFoundException(`Уровень пожара ${dto.levelId} не найден`);
+                throw new common_1.NotFoundException(`Уровень пожара с ID ${dto.levelId} не найден`);
             }
             updateData.fireLevel = {
                 connect: { id: fireLevel.id }

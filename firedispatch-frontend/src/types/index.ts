@@ -19,7 +19,10 @@ export interface AuthResponse {
 export interface FireStation {
   id: number;
   name: string;
-  location: [number, number]; // [longitude, latitude]
+  location?: [number, number]; // [longitude, latitude]
+  latitude?: number;
+  longitude?: number;
+  address?: string;
   engines?: FireEngine[];
 }
 
@@ -57,12 +60,15 @@ export interface FireLevelEngineRequirement {
 }
 
 // Статус пожара
-export type FireStatus = 'active' | 'investigating' | 'dispatched' | 'resolved';
+export type FireStatus = 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED' | 'PENDING' | 'active' | 'investigating' | 'dispatched' | 'resolved';
 
 // Пожар
 export interface Fire {
   id: number;
-  location: [number, number]; // [longitude, latitude]
+  location?: [number, number]; // [longitude, latitude]
+  latitude?: number;
+  longitude?: number;
+  address?: string;
   levelId: number;
   level?: FireLevel;
   status: FireStatus;
@@ -70,6 +76,32 @@ export interface Fire {
   updatedAt: string;
   assignedStationId: number | null;
   assignedStation?: FireStation;
+  
+  // Поля от бэкенда для совместимости
+  fireLevel?: {
+    id: number;
+    level: number;
+    name: string;
+    description?: string;
+  };
+  fireStation?: {
+    id: number;
+    name: string;
+    address?: string;
+  };
+  readableStatus?: string;
+  reportedById?: number;
+  reportedBy?: {
+    id: number;
+    name: string;
+    role: string;
+  };
+  assignedToId?: number;
+  assignedTo?: {
+    id: number;
+    name: string;
+    role: string;
+  };
 }
 
 // Назначение пожарных машин

@@ -1,5 +1,5 @@
 import React from 'react';
-import { toast as hotToast, Toaster as HotToaster } from 'react-hot-toast';
+import { toast as hotToast } from 'react-hot-toast';
 
 export interface ToastProps {
   title: string;
@@ -46,6 +46,4 @@ export function toast({ title, description, variant = 'default' }: ToastProps) {
   ), {
     duration: 5000,
   });
-}
-
-export { HotToaster as Toaster }; 
+} 

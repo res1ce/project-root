@@ -41,13 +41,39 @@ export const useFireStore = create<FireState>()(
     loadFires: async () => {
       set({ isLoading: true, error: null });
       try {
-        const response = await api.get<Fire[]>('/fire');
-        set({ fires: response.data, isLoading: false });
+        const response = await api.get<Fire[]>('/api/fire');
+        // Трансформируем данные для совместимости
+        const normalizedFires = response.data.map(fire => ({
+          ...fire,
+          // Если есть только новые поля, копируем их в старые
+          level: fire.level || (fire.fireLevel ? {
+            id: fire.fireLevel.id,
+            name: fire.fireLevel.name,
+            description: fire.fireLevel.description || ''
+          } : undefined),
+          assignedStation: fire.assignedStation || (fire.fireStation ? {
+            id: fire.fireStation.id,
+            name: fire.fireStation.name,
+            // Используем безопасные проверки для координат
+            location: fire.fireStation.address ? undefined : [0, 0]
+          } : undefined),
+          // Нормализуем статус
+          status: fire.status
+        }));
+        set({ fires: normalizedFires, isLoading: false });
       } catch (error: any) {
-        set({
-          isLoading: false,
-          error: error.response?.data?.message || 'Ошибка при загрузке пожаров',
-        });
+        console.warn('Ошибка при загрузке пожаров:', error);
+        
+        // В случае ошибки 403 просто устанавливаем пустой массив без ошибки
+        if (error.response?.status === 403) {
+          console.log('Доступ к списку пожаров запрещен для текущего пользователя. Используем пустой массив.');
+          set({ fires: [], isLoading: false });
+        } else {
+          set({
+            isLoading: false,
+            error: error.response?.data?.message || 'Ошибка при загрузке пожаров',
+          });
+        }
       }
     },
 
@@ -55,13 +81,21 @@ export const useFireStore = create<FireState>()(
     loadFireLevels: async () => {
       set({ isLoading: true, error: null });
       try {
-        const response = await api.get<FireLevel[]>('/fire/level');
+        const response = await api.get<FireLevel[]>('/api/fire-level');
         set({ levels: response.data, isLoading: false });
       } catch (error: any) {
-        set({
-          isLoading: false,
-          error: error.response?.data?.message || 'Ошибка при загрузке уровней пожара',
-        });
+        console.warn('Ошибка при загрузке уровней пожара:', error);
+        
+        // В случае ошибки 403 просто устанавливаем пустой массив без ошибки
+        if (error.response?.status === 403) {
+          console.log('Доступ к списку уровней пожара запрещен для текущего пользователя. Используем пустой массив.');
+          set({ levels: [], isLoading: false });
+        } else {
+          set({
+            isLoading: false,
+            error: error.response?.data?.message || 'Ошибка при загрузке уровней пожара',
+          });
+        }
       }
     },
 
@@ -69,13 +103,22 @@ export const useFireStore = create<FireState>()(
     loadFireStations: async () => {
       set({ isLoading: true, error: null });
       try {
-        const response = await api.get<FireStation[]>('/fire-station');
+        const response = await api.get<FireStation[]>('/api/fire-station');
         set({ stations: response.data, isLoading: false });
       } catch (error: any) {
-        set({
-          isLoading: false,
-          error: error.response?.data?.message || 'Ошибка при загрузке пожарных частей',
-        });
+        console.warn('Ошибка при загрузке пожарных частей:', error);
+        
+        // В случае ошибки 403 просто устанавливаем пустой массив без ошибки
+        if (error.response?.status === 403) {
+          console.log('Доступ к списку пожарных частей запрещен для текущего пользователя. Используем пустой массив.');
+          set({ stations: [], isLoading: false });
+        } else {
+          set({
+            stations: [],
+            isLoading: false,
+            error: error.response?.data?.message || 'Ошибка при загрузке пожарных частей',
+          });
+        }
       }
     },
 
@@ -88,7 +131,7 @@ export const useFireStore = create<FireState>()(
     createFire: async (data) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await api.post<Fire>('/fire', data);
+        const response = await api.post<Fire>('/api/fire', data);
         const { fires } = get();
         set({
           fires: [...fires, response.data],
@@ -106,7 +149,7 @@ export const useFireStore = create<FireState>()(
     updateFire: async (id, data) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await api.put<Fire>(`/fire/${id}`, data);
+        const response = await api.put<Fire>(`/api/fire/${id}`, data);
         const { fires } = get();
         set({
           fires: fires.map((f) => (f.id === id ? response.data : f)),
@@ -124,7 +167,7 @@ export const useFireStore = create<FireState>()(
     changeFireLevel: async (id, levelId, reason) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await api.put<Fire>(`/fire/${id}/level`, {
+        const response = await api.put<Fire>(`/api/fire/${id}/level`, {
           levelId,
           reason,
         });
@@ -144,7 +187,7 @@ export const useFireStore = create<FireState>()(
     // Получение назначений пожара
     getFireAssignments: async (id) => {
       try {
-        const response = await api.get<FireAssignment[]>(`/fire/${id}/assignments`);
+        const response = await api.get<FireAssignment[]>(`/api/fire/${id}/assignments`);
         return response.data;
       } catch (error: any) {
         set({
@@ -157,7 +200,7 @@ export const useFireStore = create<FireState>()(
     // Получение истории пожара
     getFireHistory: async (id) => {
       try {
-        const response = await api.get(`/fire/${id}/history`);
+        const response = await api.get(`/api/fire/${id}/history`);
         return response.data;
       } catch (error: any) {
         set({

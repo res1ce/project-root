@@ -1,9 +1,13 @@
-import { Controller, Post, Body, UseGuards, BadRequestException, Get, Param, Put, Delete } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, BadRequestException, Get, Param, Put, Delete, Req } from '@nestjs/common';
 import { FireStationService } from './fire-station.service';
 import { CreateFireStationDto } from './dto/create-fire-station.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+
+interface RequestWithUser extends Request {
+  user?: any;
+}
 
 @Controller('fire-station')
 export class FireStationController {
@@ -20,15 +24,13 @@ export class FireStationController {
     }
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @UseGuards(JwtAuthGuard)
   @Get()
-  getAll() {
-    return this.fireStationService.getAll();
+  getAll(@Req() req: RequestWithUser) {
+    return this.fireStationService.getAll(req.user.userId, req.user.role);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   getById(@Param('id') id: string) {
     return this.fireStationService.getById(Number(id));

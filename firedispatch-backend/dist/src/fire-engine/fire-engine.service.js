@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FireEngineService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const client_1 = require("@prisma/client");
 let FireEngineService = class FireEngineService {
     prisma;
     constructor(prisma) {
@@ -68,6 +69,30 @@ let FireEngineService = class FireEngineService {
     }
     async delete(id) {
         return this.prisma.vehicle.delete({ where: { id } });
+    }
+    async getAllEngineTypes() {
+        const enumValues = Object.values(client_1.VehicleType);
+        return enumValues.map((type, index) => ({
+            id: index + 1,
+            name: type,
+            description: this.getVehicleTypeDescription(type)
+        }));
+    }
+    getVehicleTypeDescription(type) {
+        switch (type) {
+            case client_1.VehicleType.FIRE_TRUCK:
+                return 'Пожарная машина';
+            case client_1.VehicleType.LADDER_TRUCK:
+                return 'Пожарная автолестница';
+            case client_1.VehicleType.RESCUE_VEHICLE:
+                return 'Спасательный автомобиль';
+            case client_1.VehicleType.WATER_TANKER:
+                return 'Автоцистерна';
+            case client_1.VehicleType.COMMAND_VEHICLE:
+                return 'Штабной автомобиль';
+            default:
+                return 'Неизвестный тип';
+        }
     }
 };
 exports.FireEngineService = FireEngineService;

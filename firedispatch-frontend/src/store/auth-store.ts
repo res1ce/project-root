@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Используем новый подход с обработкой Promise вместо try/catch
     return new Promise<void>(resolve => {
-      api.post('/auth/login', { username, password })
+      api.post('/api/auth/login', { username, password })
         .then(response => {
           const { access_token, user } = response.data;
 
@@ -101,7 +101,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     try {
-      const response = await api.get('/auth/me');
+      const response = await api.get('/api/auth/me');
       const userData = response.data;
       
       if (userData) {

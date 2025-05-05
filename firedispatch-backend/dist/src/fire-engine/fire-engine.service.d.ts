@@ -5,86 +5,92 @@ export declare class FireEngineService {
     constructor(prisma: PrismaService);
     create(dto: CreateFireEngineDto): Promise<{
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     }>;
     getAll(): Promise<({
         fireStation: {
             id: number;
-            name: string;
-            createdAt: Date;
             updatedAt: Date;
+            name: string;
             address: string;
             latitude: number;
             longitude: number;
+            createdAt: Date;
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     })[]>;
     getAllByStation(stationId: number): Promise<({
         fireStation: {
             id: number;
-            name: string;
-            createdAt: Date;
             updatedAt: Date;
+            name: string;
             address: string;
             latitude: number;
             longitude: number;
+            createdAt: Date;
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     })[]>;
     getById(id: number): Promise<({
         fireStation: {
             id: number;
-            name: string;
-            createdAt: Date;
             updatedAt: Date;
+            name: string;
             address: string;
             latitude: number;
             longitude: number;
+            createdAt: Date;
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     }) | null>;
     update(id: number, dto: CreateFireEngineDto): Promise<{
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     }>;
     delete(id: number): Promise<{
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        fireStationId: number;
+        createdAt: Date;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
         status: import(".prisma/client").$Enums.VehicleStatus;
+        fireStationId: number;
     }>;
+    getAllEngineTypes(): Promise<{
+        id: number;
+        name: "FIRE_TRUCK" | "LADDER_TRUCK" | "RESCUE_VEHICLE" | "WATER_TANKER" | "COMMAND_VEHICLE";
+        description: string;
+    }[]>;
+    private getVehicleTypeDescription;
 }

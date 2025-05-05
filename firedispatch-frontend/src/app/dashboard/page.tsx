@@ -21,19 +21,18 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // В реальном приложении здесь был бы запрос к API для получения статистики
-        // const response = await api.get('/dashboard/stats');
-        // setStats(response.data);
-
-        // Заглушка для статистики
+        setLoading(true);
+        const response = await api.get('/api/dashboard/stats');
+        setStats(response.data);
+      } catch (error: any) {
+        console.error('Error fetching dashboard stats:', error);
+        // Если API еще не реализовано или вернуло ошибку, используем моковые данные
         setStats({
-          totalFires: 15,
+          totalFires: 14,
           activeFiresCount: 3,
-          resolvedFiresCount: 12,
+          resolvedFiresCount: 11,
           stationsCount: 5
         });
-      } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
       } finally {
         setLoading(false);
       }

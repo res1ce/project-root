@@ -39,10 +39,10 @@ export default function StationVehiclesPage() {
         setLoading(true);
         
         // Получаем данные о машинах
-        const vehiclesResponse = await api.get<FireEngine[]>('/fire-engine');
+        const vehiclesResponse = await api.get<FireEngine[]>('/api/fire-engine');
         
         // Получаем типы машин
-        const typesResponse = await api.get<FireEngineType[]>('/fire-engine/types');
+        const typesResponse = await api.get<FireEngineType[]>('/api/engine-type');
         
         setVehicles(vehiclesResponse.data);
         setEngineTypes(typesResponse.data);
@@ -81,7 +81,7 @@ export default function StationVehiclesPage() {
   const handleDeleteVehicle = async (id: number) => {
     if (window.confirm('Вы уверены, что хотите удалить эту пожарную машину?')) {
       try {
-        await api.delete(`/fire-engine/${id}`);
+        await api.delete(`/api/fire-engine/${id}`);
         
         // Обновляем список машин
         setVehicles(vehicles.filter(v => v.id !== id));
@@ -117,7 +117,7 @@ export default function StationVehiclesPage() {
       if (isEditMode && currentVehicle.id) {
         // Обновление существующей
         const response = await api.put<FireEngine>(
-          `/fire-engine/${currentVehicle.id}`, 
+          `/api/fire-engine/${currentVehicle.id}`, 
           currentVehicle
         );
         
@@ -131,7 +131,7 @@ export default function StationVehiclesPage() {
         });
       } else {
         // Создание новой
-        const response = await api.post<FireEngine>('/fire-engine', currentVehicle);
+        const response = await api.post<FireEngine>('/api/fire-engine', currentVehicle);
         
         // Добавляем новую машину в список
         setVehicles([...vehicles, response.data]);

@@ -16,285 +16,285 @@ export declare class FireController {
     create(dto: CreateFireDto, req: RequestWithUser): Promise<{
         assignedVehicles: {
             id: number;
+            status: import(".prisma/client").$Enums.VehicleStatus;
             createdAt: Date;
             updatedAt: Date;
             fireStationId: number;
             model: string;
             type: import(".prisma/client").$Enums.VehicleType;
-            status: import(".prisma/client").$Enums.VehicleStatus;
         }[];
-        fireLevel: {
-            id: number;
-            level: number;
-            name: string;
-            description: string;
-            createdAt: Date;
-            updatedAt: Date;
-        };
-        fireStation: {
-            id: number;
-            name: string;
-            createdAt: Date;
-            updatedAt: Date;
-            address: string;
-            latitude: number;
-            longitude: number;
-        };
         reportedBy: {
             id: number;
-            name: string;
             createdAt: Date;
             updatedAt: Date;
+            fireStationId: number | null;
             username: string;
             password: string;
             role: import(".prisma/client").$Enums.UserRole;
-            fireStationId: number | null;
+            name: string;
         };
         assignedTo: {
             id: number;
-            name: string;
             createdAt: Date;
             updatedAt: Date;
+            fireStationId: number | null;
             username: string;
             password: string;
             role: import(".prisma/client").$Enums.UserRole;
-            fireStationId: number | null;
-        };
-        id: number;
-        description: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        fireLevelId: number;
-        address: string | null;
-        latitude: number;
-        longitude: number;
-        fireStationId: number;
-        status: import(".prisma/client").$Enums.IncidentStatus;
-        reportedById: number;
-        assignedToId: number;
-        resolvedAt: Date | null;
-    }>;
-    getAll(): Promise<({
-        fireLevel: {
-            id: number;
-            level: number;
             name: string;
-            description: string;
-            createdAt: Date;
-            updatedAt: Date;
         };
         fireStation: {
             id: number;
-            name: string;
+            latitude: number;
+            longitude: number;
             createdAt: Date;
             updatedAt: Date;
             address: string;
+            name: string;
+        };
+        fireLevel: {
+            id: number;
+            description: string;
+            createdAt: Date;
+            updatedAt: Date;
+            name: string;
+            level: number;
+        };
+        id: number;
+        latitude: number;
+        longitude: number;
+        status: import(".prisma/client").$Enums.IncidentStatus;
+        description: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        resolvedAt: Date | null;
+        address: string | null;
+        reportedById: number;
+        assignedToId: number;
+        fireStationId: number;
+        fireLevelId: number;
+    }>;
+    getAll(req: RequestWithUser): Promise<{
+        readableStatus: string;
+        reportedBy: {
+            id: number;
+            role: import(".prisma/client").$Enums.UserRole;
+            name: string;
+        };
+        assignedTo: {
+            id: number;
+            role: import(".prisma/client").$Enums.UserRole;
+            name: string;
+        };
+        fireStation: {
+            id: number;
             latitude: number;
             longitude: number;
+            createdAt: Date;
+            updatedAt: Date;
+            address: string;
+            name: string;
+        };
+        fireLevel: {
+            id: number;
+            description: string;
+            createdAt: Date;
+            updatedAt: Date;
+            name: string;
+            level: number;
         };
         vehicles: {
             id: number;
+            status: import(".prisma/client").$Enums.VehicleStatus;
             createdAt: Date;
             updatedAt: Date;
             fireStationId: number;
             model: string;
             type: import(".prisma/client").$Enums.VehicleType;
-            status: import(".prisma/client").$Enums.VehicleStatus;
         }[];
         reports: {
             id: number;
             createdAt: Date;
             updatedAt: Date;
+            content: string;
             userId: number;
             fireIncidentId: number;
-            content: string;
         }[];
-        reportedBy: {
-            id: number;
-            name: string;
-            role: import(".prisma/client").$Enums.UserRole;
-        };
-        assignedTo: {
-            id: number;
-            name: string;
-            role: import(".prisma/client").$Enums.UserRole;
-        };
-    } & {
         id: number;
+        latitude: number;
+        longitude: number;
+        status: import(".prisma/client").$Enums.IncidentStatus;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
+        resolvedAt: Date | null;
         address: string | null;
-        latitude: number;
-        longitude: number;
-        fireStationId: number;
-        status: import(".prisma/client").$Enums.IncidentStatus;
         reportedById: number;
         assignedToId: number;
-        resolvedAt: Date | null;
-    })[]>;
+        fireStationId: number;
+        fireLevelId: number;
+    }[]>;
     getById(id: string): Promise<{
+        readableStatus: string;
+        reportedBy: {
+            id: number;
+            role: import(".prisma/client").$Enums.UserRole;
+            name: string;
+        };
+        assignedTo: {
+            id: number;
+            role: import(".prisma/client").$Enums.UserRole;
+            name: string;
+        };
+        fireStation: {
+            id: number;
+            latitude: number;
+            longitude: number;
+            createdAt: Date;
+            updatedAt: Date;
+            address: string;
+            name: string;
+        };
         fireLevel: {
             requirements: {
                 id: number;
                 createdAt: Date;
                 updatedAt: Date;
-                count: number;
                 fireLevelId: number;
+                count: number;
                 vehicleType: import(".prisma/client").$Enums.VehicleType;
             }[];
         } & {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
-        };
-        fireStation: {
-            id: number;
             name: string;
-            createdAt: Date;
-            updatedAt: Date;
-            address: string;
-            latitude: number;
-            longitude: number;
+            level: number;
         };
         vehicles: {
             id: number;
+            status: import(".prisma/client").$Enums.VehicleStatus;
             createdAt: Date;
             updatedAt: Date;
             fireStationId: number;
             model: string;
             type: import(".prisma/client").$Enums.VehicleType;
-            status: import(".prisma/client").$Enums.VehicleStatus;
         }[];
         reports: {
             id: number;
             createdAt: Date;
             updatedAt: Date;
+            content: string;
             userId: number;
             fireIncidentId: number;
-            content: string;
         }[];
-        reportedBy: {
-            id: number;
-            name: string;
-            role: import(".prisma/client").$Enums.UserRole;
-        };
-        assignedTo: {
-            id: number;
-            name: string;
-            role: import(".prisma/client").$Enums.UserRole;
-        };
-    } & {
         id: number;
+        latitude: number;
+        longitude: number;
+        status: import(".prisma/client").$Enums.IncidentStatus;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
+        resolvedAt: Date | null;
         address: string | null;
-        latitude: number;
-        longitude: number;
-        fireStationId: number;
-        status: import(".prisma/client").$Enums.IncidentStatus;
         reportedById: number;
         assignedToId: number;
-        resolvedAt: Date | null;
+        fireStationId: number;
+        fireLevelId: number;
     }>;
     update(id: string, dto: CreateFireDto, req: RequestWithUser): Promise<{
-        fireLevel: {
+        reportedBy: {
             id: number;
-            level: number;
-            name: string;
-            description: string;
             createdAt: Date;
             updatedAt: Date;
+            fireStationId: number | null;
+            username: string;
+            password: string;
+            role: import(".prisma/client").$Enums.UserRole;
+            name: string;
+        };
+        assignedTo: {
+            id: number;
+            createdAt: Date;
+            updatedAt: Date;
+            fireStationId: number | null;
+            username: string;
+            password: string;
+            role: import(".prisma/client").$Enums.UserRole;
+            name: string;
         };
         fireStation: {
             id: number;
-            name: string;
+            latitude: number;
+            longitude: number;
             createdAt: Date;
             updatedAt: Date;
             address: string;
-            latitude: number;
-            longitude: number;
+            name: string;
+        };
+        fireLevel: {
+            id: number;
+            description: string;
+            createdAt: Date;
+            updatedAt: Date;
+            name: string;
+            level: number;
         };
         vehicles: {
             id: number;
+            status: import(".prisma/client").$Enums.VehicleStatus;
             createdAt: Date;
             updatedAt: Date;
             fireStationId: number;
             model: string;
             type: import(".prisma/client").$Enums.VehicleType;
-            status: import(".prisma/client").$Enums.VehicleStatus;
         }[];
-        reportedBy: {
-            id: number;
-            name: string;
-            createdAt: Date;
-            updatedAt: Date;
-            username: string;
-            password: string;
-            role: import(".prisma/client").$Enums.UserRole;
-            fireStationId: number | null;
-        };
-        assignedTo: {
-            id: number;
-            name: string;
-            createdAt: Date;
-            updatedAt: Date;
-            username: string;
-            password: string;
-            role: import(".prisma/client").$Enums.UserRole;
-            fireStationId: number | null;
-        };
     } & {
         id: number;
+        latitude: number;
+        longitude: number;
+        status: import(".prisma/client").$Enums.IncidentStatus;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
+        resolvedAt: Date | null;
         address: string | null;
-        latitude: number;
-        longitude: number;
-        fireStationId: number;
-        status: import(".prisma/client").$Enums.IncidentStatus;
         reportedById: number;
         assignedToId: number;
-        resolvedAt: Date | null;
+        fireStationId: number;
+        fireLevelId: number;
     }>;
     delete(id: string): Promise<{
         id: number;
+        latitude: number;
+        longitude: number;
+        status: import(".prisma/client").$Enums.IncidentStatus;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
+        resolvedAt: Date | null;
         address: string | null;
-        latitude: number;
-        longitude: number;
-        fireStationId: number;
-        status: import(".prisma/client").$Enums.IncidentStatus;
         reportedById: number;
         assignedToId: number;
-        resolvedAt: Date | null;
+        fireStationId: number;
+        fireLevelId: number;
     }>;
     getAssignments(id: string): Promise<{
         id: number;
+        status: import(".prisma/client").$Enums.VehicleStatus;
         createdAt: Date;
         updatedAt: Date;
         fireStationId: number;
         model: string;
         type: import(".prisma/client").$Enums.VehicleType;
-        status: import(".prisma/client").$Enums.VehicleStatus;
     }[]>;
     getFireHistory(id: string): Promise<({
         user: {
             id: number;
-            name: string;
             username: string;
             role: import(".prisma/client").$Enums.UserRole;
+            name: string;
         };
     } & {
         id: number;
@@ -308,77 +308,77 @@ export declare class FireController {
     getAllRequirements(): Promise<({
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
         createdAt: Date;
         updatedAt: Date;
-        count: number;
         fireLevelId: number;
+        count: number;
         vehicleType: import(".prisma/client").$Enums.VehicleType;
     })[]>;
     getRequirementById(id: string): Promise<{
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
         createdAt: Date;
         updatedAt: Date;
-        count: number;
         fireLevelId: number;
+        count: number;
         vehicleType: import(".prisma/client").$Enums.VehicleType;
     }>;
     createRequirement(dto: CreateFireLevelRequirementDto): Promise<{
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
         createdAt: Date;
         updatedAt: Date;
-        count: number;
         fireLevelId: number;
+        count: number;
         vehicleType: import(".prisma/client").$Enums.VehicleType;
     }>;
     updateRequirement(id: string, dto: CreateFireLevelRequirementDto): Promise<{
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
         createdAt: Date;
         updatedAt: Date;
-        count: number;
         fireLevelId: number;
+        count: number;
         vehicleType: import(".prisma/client").$Enums.VehicleType;
     }>;
     deleteRequirement(id: string): Promise<{
         id: number;
         createdAt: Date;
         updatedAt: Date;
-        count: number;
         fireLevelId: number;
+        count: number;
         vehicleType: import(".prisma/client").$Enums.VehicleType;
     }>;
     getAllLevels(): Promise<({
@@ -389,152 +389,185 @@ export declare class FireController {
         }[];
     } & {
         id: number;
-        level: number;
-        name: string;
         description: string;
         createdAt: Date;
         updatedAt: Date;
+        name: string;
+        level: number;
     })[]>;
     getLevelById(id: string): Promise<{
         requirements: {
             id: number;
             createdAt: Date;
             updatedAt: Date;
-            count: number;
             fireLevelId: number;
+            count: number;
             vehicleType: import(".prisma/client").$Enums.VehicleType;
         }[];
     } & {
         id: number;
-        level: number;
-        name: string;
         description: string;
         createdAt: Date;
         updatedAt: Date;
+        name: string;
+        level: number;
     }>;
     createLevel(dto: CreateFireLevelDto): Promise<{
         id: number;
-        level: number;
-        name: string;
         description: string;
         createdAt: Date;
         updatedAt: Date;
+        name: string;
+        level: number;
     }>;
     updateLevel(id: string, dto: CreateFireLevelDto): Promise<{
         id: number;
-        level: number;
-        name: string;
         description: string;
         createdAt: Date;
         updatedAt: Date;
+        name: string;
+        level: number;
     }>;
     deleteLevel(id: string): Promise<{
         id: number;
-        level: number;
-        name: string;
         description: string;
         createdAt: Date;
         updatedAt: Date;
+        name: string;
+        level: number;
     }>;
     changeFireLevel(id: string, dto: ChangeFireLevelDto, req: RequestWithUser): Promise<{
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
+        latitude: number;
+        longitude: number;
+        status: import(".prisma/client").$Enums.IncidentStatus;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
+        resolvedAt: Date | null;
         address: string | null;
-        latitude: number;
-        longitude: number;
-        fireStationId: number;
-        status: import(".prisma/client").$Enums.IncidentStatus;
         reportedById: number;
         assignedToId: number;
-        resolvedAt: Date | null;
+        fireStationId: number;
+        fireLevelId: number;
     }>;
     getAllAddressLevels(): Promise<({
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
         address: string;
+        fireLevelId: number;
     })[]>;
     getAddressLevelById(id: string): Promise<{
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
         address: string;
+        fireLevelId: number;
     }>;
     createAddressLevel(dto: CreateAddressLevelDto): Promise<{
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
         address: string;
+        fireLevelId: number;
     }>;
     updateAddressLevel(id: string, dto: CreateAddressLevelDto): Promise<{
         fireLevel: {
             id: number;
-            level: number;
-            name: string;
             description: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            level: number;
         };
     } & {
         id: number;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
         address: string;
+        fireLevelId: number;
     }>;
     deleteAddressLevel(id: string): Promise<{
         id: number;
         description: string | null;
         createdAt: Date;
         updatedAt: Date;
-        fireLevelId: number;
         address: string;
+        fireLevelId: number;
+    }>;
+    resolveFire(id: string, req: RequestWithUser): Promise<{
+        fireStation: {
+            id: number;
+            latitude: number;
+            longitude: number;
+            createdAt: Date;
+            updatedAt: Date;
+            address: string;
+            name: string;
+        };
+        fireLevel: {
+            id: number;
+            description: string;
+            createdAt: Date;
+            updatedAt: Date;
+            name: string;
+            level: number;
+        };
+    } & {
+        id: number;
+        latitude: number;
+        longitude: number;
+        status: import(".prisma/client").$Enums.IncidentStatus;
+        description: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        resolvedAt: Date | null;
+        address: string | null;
+        reportedById: number;
+        assignedToId: number;
+        fireStationId: number;
+        fireLevelId: number;
     }>;
 }
 export {};

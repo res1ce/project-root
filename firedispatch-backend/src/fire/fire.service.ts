@@ -2,7 +2,7 @@ import { Injectable, Inject, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFireDto } from './dto/create-fire.dto';
 import { FireEventsGateway } from './fire-events.gateway';
-import { IncidentStatus, VehicleStatus, VehicleType } from '@prisma/client';
+import { IncidentStatus, VehicleStatus, VehicleType, UserRole } from '@prisma/client';
 import { CreateFireLevelDto } from './dto/create-firelevel.dto';
 import { ChangeFireLevelDto } from './dto/change-fire-level.dto';
 import { CreateFireLevelRequirementDto } from './dto/create-firelevel-requirement.dto';
@@ -155,8 +155,72 @@ export class FireService {
     };
   }
 
-  async getAll() {
-    return this.prisma.fireIncident.findMany({
+  // Преобразование статуса пожара в человекочитаемый формат
+  private getReadableStatus(status: IncidentStatus): string {
+    const statusMap = {
+      [IncidentStatus.PENDING]: 'Ожидает обработки',
+      [IncidentStatus.IN_PROGRESS]: 'В процессе тушения',
+      [IncidentStatus.RESOLVED]: 'Потушен',
+      [IncidentStatus.CANCELLED]: 'Отменен'
+    };
+    return statusMap[status] || status;
+  }
+
+  // Изменяем метод getAll
+  async getAll(userId?: number, userRole?: UserRole | string) {
+    console.log(`[DEBUG] FireService.getAll: запрос с userId=${userId}, userRole=${userRole}`);
+    
+    // Проверяем роль пользователя (может быть как строка, так и enum)
+    const isStationDispatcher = 
+      userRole === UserRole.STATION_DISPATCHER || 
+      userRole === 'station_dispatcher' || 
+      userRole === 'STATION_DISPATCHER';
+    
+    // Если пользователь - диспетчер пожарной части, показываем только пожары его части
+    if (userId && isStationDispatcher) {
+      console.log(`[DEBUG] FireService.getAll: пользователь - диспетчер станции`);
+      
+      // Определяем пожарную часть пользователя
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { fireStationId: true }
+      });
+
+      console.log(`[DEBUG] FireService.getAll: fireStationId пользователя = ${user?.fireStationId}`);
+
+      if (!user?.fireStationId) {
+        throw new BadRequestException('Пользователь не привязан к пожарной части');
+      }
+
+      const fires = await this.prisma.fireIncident.findMany({
+        where: { fireStationId: user.fireStationId },
+        include: {
+          reportedBy: {
+            select: { id: true, name: true, role: true }
+          },
+          assignedTo: {
+            select: { id: true, name: true, role: true }
+          },
+          fireStation: true,
+          vehicles: true,
+          reports: true,
+          fireLevel: true
+        }
+      });
+
+      console.log(`[DEBUG] FireService.getAll: найдено ${fires.length} пожаров для части ${user.fireStationId}`);
+
+      // Добавляем человекочитаемый статус
+      return fires.map(fire => ({
+        ...fire,
+        readableStatus: this.getReadableStatus(fire.status)
+      }));
+    }
+
+    console.log(`[DEBUG] FireService.getAll: пользователь - центральный диспетчер или администратор`);
+    
+    // Центральный диспетчер или администратор видит все пожары
+    const fires = await this.prisma.fireIncident.findMany({
       include: {
         reportedBy: {
           select: { id: true, name: true, role: true }
@@ -170,13 +234,21 @@ export class FireService {
         fireLevel: true
       }
     });
+
+    console.log(`[DEBUG] FireService.getAll: найдено всего ${fires.length} пожаров`);
+
+    // Добавляем человекочитаемый статус
+    return fires.map(fire => ({
+      ...fire,
+      readableStatus: this.getReadableStatus(fire.status)
+    }));
   }
 
   async getById(id: number) {
     const fireId = Number(id);
     if (!fireId || isNaN(fireId)) throw new BadRequestException('Некорректный id');
 
-    return this.prisma.fireIncident.findUnique({
+    const fire = await this.prisma.fireIncident.findUnique({
       where: { id: fireId },
       include: {
         reportedBy: {
@@ -195,6 +267,14 @@ export class FireService {
         }
       }
     });
+
+    if (!fire) return null;
+
+    // Добавляем человекочитаемый статус
+    return {
+      ...fire,
+      readableStatus: this.getReadableStatus(fire.status)
+    };
   }
 
   async update(id: number, dto: CreateFireDto) {
@@ -216,12 +296,13 @@ export class FireService {
     }
     
     if (dto.levelId) {
+      // Поиск по id вместо level
       const fireLevel = await this.prisma.fireLevel.findUnique({
-        where: { level: dto.levelId }
+        where: { id: dto.levelId }
       });
       
       if (!fireLevel) {
-        throw new NotFoundException(`Уровень пожара ${dto.levelId} не найден`);
+        throw new NotFoundException(`Уровень пожара с ID ${dto.levelId} не найден`);
       }
       
       updateData.fireLevel = {
@@ -465,7 +546,7 @@ export class FireService {
       throw new NotFoundException(`Пожар с ID ${fireId} не найден`);
     }
     
-    // Проверяем, существует ли новый уровень пожара
+    // Проверяем, существует ли новый уровень пожара по ID
     const newLevel = await this.prisma.fireLevel.findUnique({
       where: { id: dto.newLevel }
     });

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, BadRequestException, Get, Param, Put, Delete, Req, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, BadRequestException, Get, Param, Put, Delete, Req, NotFoundException, Patch } from '@nestjs/common';
 import { FireService } from './fire.service';
 import { CreateFireDto } from './dto/create-fire.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,6 +10,7 @@ import { Request } from 'express';
 import { CreateFireLevelDto } from './dto/create-firelevel.dto';
 import { CreateFireLevelRequirementDto } from './dto/create-firelevel-requirement.dto';
 import { CreateAddressLevelDto } from './dto/create-address-level.dto';
+import { IncidentStatus } from '@prisma/client';
 
 interface RequestWithUser extends Request {
   user?: any;
@@ -55,8 +56,9 @@ export class FireController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  getAll() {
-    return this.fireService.getAll();
+  getAll(@Req() req: RequestWithUser) {
+    // Передаем ID пользователя и его роль в сервис для фильтрации пожаров
+    return this.fireService.getAll(req.user.userId, req.user.role);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -254,5 +256,25 @@ export class FireController {
   @Delete('/address-level/:id')
   deleteAddressLevel(@Param('id') id: string) {
     return this.fireService.deleteAddressLevel(Number(id));
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('central_dispatcher', 'station_dispatcher')
+  @Patch(':id/resolve')
+  async resolveFire(@Param('id') id: string, @Req() req: RequestWithUser) {
+    const numId = Number(id);
+    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
+    
+    const result = await this.fireService.setFireStatus(numId, 'RESOLVED' as IncidentStatus);
+    
+    // Логируем действие
+    await this.userActivityService.logActivity(
+      req.user.userId,
+      'resolve_fire',
+      { fireId: numId },
+      req
+    );
+    
+    return result;
   }
 }

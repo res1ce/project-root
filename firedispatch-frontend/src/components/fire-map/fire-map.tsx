@@ -8,6 +8,11 @@ import { Fire, FireStation } from '@/types';
 import { load } from '@2gis/mapgl';
 import { Clusterer } from '@2gis/mapgl-clusterer';
 import { AddressSearch } from '@/components/ui/address-search';
+import { toast } from '@/components/ui/toast';
+
+// Заглушки данных для тестирования
+const MOCK_FIRES: Fire[] = [];
+const MOCK_STATIONS: FireStation[] = [];
 
 // Настройки маркеров
 const DEFAULT_MARKER_OPTIONS = {
@@ -36,62 +41,6 @@ const STATION_MARKER_OPTIONS = {
   size: [32, 32],
   anchor: [16, 32],
 };
-
-// Демонстрационные пожары
-const MOCK_FIRES: Fire[] = [
-  {
-    id: 1,
-    location: [52.029, 113.503], // [широта, долгота] - Чита, площадь Ленина
-    levelId: 2,
-    level: { id: 2, name: '2', description: 'Средний пожар' },
-    status: 'active',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    assignedStationId: 1,
-    assignedStation: { id: 1, name: 'Пожарная часть №1', location: [52.034, 113.497] }
-  },
-  {
-    id: 2,
-    location: [52.040, 113.520], // [широта, долгота] - Чита, Микрорайон Северный
-    levelId: 1,
-    level: { id: 1, name: '1', description: 'Разведка' },
-    status: 'investigating',
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    updatedAt: new Date(Date.now() - 1800000).toISOString(),
-    assignedStationId: 2,
-    assignedStation: { id: 2, name: 'Пожарная часть №2', location: [52.045, 113.517] }
-  },
-  {
-    id: 3,
-    location: [52.020, 113.480], // [широта, долгота] - Чита, район Железнодорожный
-    levelId: 3,
-    level: { id: 3, name: '3', description: 'Крупный пожар' },
-    status: 'dispatched',
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000).toISOString(),
-    assignedStationId: 3,
-    assignedStation: { id: 3, name: 'Пожарная часть №3', location: [52.018, 113.490] }
-  }
-];
-
-// Демонстрационные пожарные части
-const MOCK_STATIONS: FireStation[] = [
-  {
-    id: 1,
-    name: 'Пожарная часть №1',
-    location: [52.034, 113.497] // [широта, долгота] - Чита, ул. Ленина
-  },
-  {
-    id: 2,
-    name: 'Пожарная часть №2',
-    location: [52.045, 113.517] // [широта, долгота] - Чита, ул. Бабушкина
-  },
-  {
-    id: 3,
-    name: 'Пожарная часть №3',
-    location: [52.018, 113.490] // [широта, долгота] - Чита, 1-й мкр
-  }
-];
 
 export interface FireMapProps {
   onFireSelect?: (fire: Fire) => void;
@@ -143,13 +92,23 @@ export default function FireMap({
   const selectedMarkerRef = useRef<any>(null);
   const MapGLRef = useRef<any>(null);
   const clustererRef = useRef<any>(null);
+  const [mapInitialized, setMapInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingStep, setLoadingStep] = useState('Инициализация карты...');
 
   // Загружаем настройки и данные
   useEffect(() => {
+    console.log('[DEBUG] Загружаем настройки...');
     fetchSettings();
-    loadFires();
+    console.log('[DEBUG] Загружаем информацию о пожарах...');
+    loadFires().then(() => {
+      console.log('[DEBUG] Пожары загружены:', fires.length > 0 ? fires : 'Нет данных');
+    });
     if (showStations) {
-      loadFireStations();
+      console.log('[DEBUG] Загружаем информацию о пожарных частях...');
+      loadFireStations().then(() => {
+        console.log('[DEBUG] Пожарные части загружены:', stations.length > 0 ? stations : 'Нет данных');
+      });
     }
   }, [fetchSettings, loadFires, loadFireStations, showStations]);
 
@@ -241,721 +200,184 @@ export default function FireMap({
   // Инициализация карты
   useEffect(() => {
     // Если нет контейнера или API ключа, выходим
-    if (!mapContainerRef.current || !API_KEY) return;
+    if (!mapContainerRef.current || !API_KEY) {
+      setError('Не удалось инициализировать контейнер карты или API ключ');
+      return;
+    }
     
     console.log('[DEBUG] Начинаем инициализацию карты 2GIS...');
+    setLoadingStep('Загрузка SDK карты...');
     
-    // Проверка начальных координат
-    const initialMapCenter = initialCenter 
-      ? [initialCenter[1], initialCenter[0]] // переводим [lat, lng] в [lng, lat] для 2GIS
-      : mapCenter;
+    let isMounted = true;
     
-    const initialMapZoom = zoom || mapZoom;
-
     // Асинхронная функция для инициализации карты
     async function initMap() {
       try {
-        // Загружаем SDK карты
+        // Загружаем SDK карты с увеличенным таймаутом
+        console.log('[DEBUG] Загружаем SDK 2GIS...');
         const mapgl = await load();
-        MapGLRef.current = mapgl;
         
+        if (!isMounted) return;
         console.log('[DEBUG] SDK 2GIS загружен успешно');
         
-        // Получаем реальный DOM-элемент контейнера (гарантированно не null из-за проверки выше)
+        // Сохраняем mapgl в ref для последующего использования
+        MapGLRef.current = mapgl;
+        
+        setLoadingStep('Создание экземпляра карты...');
+        
+        // Проверяем, что контейнер все еще существует
+        if (!mapContainerRef.current) {
+          setError('Контейнер карты больше не существует');
+          return;
+        }
+        
+        // Получаем реальный DOM-элемент контейнера
         const mapContainer = mapContainerRef.current as HTMLElement;
         
         // Создаем экземпляр карты с центром и зумом
-        const map = new mapgl.Map(mapContainer, {
-          center: initialMapCenter,
-          zoom: initialMapZoom,
-          key: API_KEY,
-          zoomControl: true,
-        });
-        
-        console.log('[DEBUG] Карта 2GIS инициализирована с центром:', initialMapCenter);
-        
-        // Сохраняем экземпляр карты в реф
-        mapInstanceRef.current = map;
-        
-        // Создаем кластеризатор для группировки близких маркеров
         try {
-          console.log('[DEBUG] Инициализация кластеризатора...');
+          console.log('[DEBUG] Создаем экземпляр карты с настройками:', {
+            center: mapCenter,
+            zoom: mapZoom,
+            key: API_KEY ? 'Установлен' : 'Не установлен'
+          });
           
-          // Настройки кластеризатора
-          const clustererOptions = {
-            radius: 60,
-            clusterStyle: (count: number) => ({
-              icon: 'https://cdn-icons-png.flaticon.com/512/3448/3448609.png',
-              size: [40, 40],
-              labelText: count.toString(),
-              labelColor: '#ffffff',
-              labelFontSize: 14,
-              labelOffset: [0, 0],
-            })
-          };
+          const map = new mapgl.Map(mapContainer, {
+            center: mapCenter,
+            zoom: mapZoom,
+            key: API_KEY,
+            zoomControl: true,
+          });
           
-          // Создаем кластеризатор
-          const clusterer = new Clusterer(map, clustererOptions);
+          if (!isMounted) {
+            map.destroy();
+            return;
+          }
           
-          // Сохраняем кластеризатор
-          clustererRef.current = clusterer;
-          console.log('[DEBUG] Кластеризатор успешно инициализирован');
-        } catch (e) {
-          console.error('[DEBUG] Ошибка при инициализации кластеризатора:', e);
-        }
-        
-        // Добавляем обработчик клика для создания маркера
-        if (allowCreation) {
-          console.log('[DEBUG] Добавляем обработчик для создания маркера');
+          console.log('[DEBUG] Карта 2GIS инициализирована успешно');
+          
+          // Сохраняем экземпляр карты в реф
+          mapInstanceRef.current = map;
+          setMapInitialized(true);
+          setLoadingStep('Карта загружена!');
+          
+          // Добавляем простой обработчик клика для тестирования
           map.on('click', (e: any) => {
-            console.log('[DEBUG] Клик по карте получен', e);
-            // Только если клик по карте, а не по маркеру
+            console.log('[DEBUG] Клик по карте:', e);
+            
+            // Проверяем, был ли клик по маркеру, если да - игнорируем для создания новой метки
             if (e.targetType === 'marker') {
               console.log('[DEBUG] Клик по маркеру, игнорируем для создания новой метки');
               return;
             }
-            console.log('[DEBUG] Клик по карте, создаем новую метку');
-            const coordinates = getSafeCoordinates(e);
-            if (!coordinates) {
-              console.log('[DEBUG] Некорректные координаты, метка не создана');
-              return;
-            }
-            const [lng, lat] = coordinates;
-            console.log('[DEBUG] Координаты для новой метки:', lng, lat);
-
-            // Удаляем предыдущий маркер выбора если он есть
-            if (selectedMarkerRef.current) {
-              console.log('[DEBUG] Удаляем предыдущий маркер выбора');
-              try {
-                if (typeof selectedMarkerRef.current.destroy === 'function') {
-                  selectedMarkerRef.current.destroy();
-                } else {
-                  console.log('[DEBUG] Маркер не имеет метода destroy, пропускаем');
-                }
-              } catch (err) {
-                console.error('[DEBUG] Ошибка при удалении предыдущего маркера:', err);
-              }
-              selectedMarkerRef.current = null;
-              delete markersRef.current['selection'];
-            }
-
-            // Сохраняем выбранную локацию в состоянии для восстановления
-            setSelectionMarker({
-              visible: true,
-              lat: lat,
-              lng: lng
-            });
-            console.log('[DEBUG] Установлено состояние selectionMarker для будущего восстановления');
-
-            // Создаем маркер выбора стандартным способом через API 2GIS
-            try {
-              console.log('[DEBUG] Создаем маркер выбора стандартным способом через 2GIS API');
-              const newMarker = new mapgl.Marker(map, {
-                coordinates: [lng, lat],
-                icon: SELECTION_MARKER_OPTIONS.icon,
-                size: SELECTION_MARKER_OPTIONS.size,
-                anchor: SELECTION_MARKER_OPTIONS.anchor,
-                userData: { type: 'selection', id: 'selection-marker' },
-                interactive: true,
-                zIndex: 1000 // высокий z-index чтобы он был поверх других маркеров
-              });
-              
-              // Сохраняем маркер в обоих рефах
-              selectedMarkerRef.current = newMarker;
-              markersRef.current['selection'] = newMarker;
-              
-              // Сохраняем оригинальные координаты
-              markersRef.current['selection'].selectionLocation = [lng, lat];
-              
-              console.log('[DEBUG] Маркер выбора успешно создан:', newMarker);
-            } catch (error) {
-              console.error('[DEBUG] Ошибка при создании маркера выбора:', error);
-            }
-
-            // Центрируем карту на маркере
-            map.setCenter([lng, lat]);
-            console.log('[DEBUG] Карта центрирована на координатах:', [lng, lat]);
-
-            // Показываем попап для выбранной точки
-            console.log('[DEBUG] Показываем попап для выбранной точки');
-            showPopup(
-              [lng, lat],
-              `<div style="padding: 5px;">
-                <div style="font-weight: bold; margin: 0 0 5px; color: #ff9800; font-size: 16px;">Выбранное место</div>
-                <div style="margin: 0 0 5px;">Координаты: ${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
-                <div style="font-size: 12px; color: #666;">Для создания пожара нажмите \"Отметить пожар\"</div>
-              </div>`
-            );
-
-            // onLocationSelect вызывается с правильными координатами
-            if (onLocationSelect) {
-              console.log('[DEBUG] Вызываем onLocationSelect с координатами:', lat, lng);
-              onLocationSelect(lat, lng);
-            }
-          });
-        }
-        
-        // Добавляем глобальный обработчик клика — только для маркеров!
-        map.on('click', (e: any) => {
-          if (e.targetType !== 'marker') return;
-          const marker = e.target;
-          if (marker && marker.userData) {
-            const { type, id, data } = marker.userData;
-            closeActivePopup();
-            if (type === 'fire' && data) {
-              if (onFireSelect) onFireSelect(data);
-              showPopup(marker.getCoordinates(), getFirePopupHtml(data));
-            } else if (type === 'station' && data) {
-              showPopup(marker.getCoordinates(), getStationPopupHtml(data));
-            }
-          }
-        });
-        
-        // Добавляем маркеры на карту
-        addMarkers();
-        
-      } catch (error) {
-        console.error('Критическая ошибка при инициализации карты:', error);
-      }
-    }
-    
-    // Функция для добавления маркеров на карту
-    function addMarkers() {
-      if (!mapInstanceRef.current || !MapGLRef.current) {
-        console.error('Экземпляр карты или MapGL не инициализирован');
-        return;
-      }
-      
-      const map = mapInstanceRef.current;
-      const mapgl = MapGLRef.current;
-      
-      console.log('Добавляем маркеры на карту...');
-      console.log('Текущее состояние маркеров:', Object.keys(markersRef.current));
-      
-      // Сохраняем данные о выбранной локации, если есть
-      let selectionLocation = null;
-      if (markersRef.current['selection']) {
-        try {
-          if (typeof markersRef.current['selection'].getCoordinates === 'function') {
-            selectionLocation = markersRef.current['selection'].getCoordinates();
-            console.log('[DEBUG] Сохранены координаты маркера выбора:', selectionLocation);
-          } else if (markersRef.current['selection'].selectionLocation) {
-            selectionLocation = markersRef.current['selection'].selectionLocation;
-            console.log('[DEBUG] Сохранены сохраненные координаты маркера выбора:', selectionLocation);
-          }
-        } catch (e) {
-          console.error('[DEBUG] Ошибка при получении координат маркера выбора:', e);
-        }
-      }
-      
-      // Также проверяем состояние selectionMarker
-      if (selectionMarker.visible && selectionMarker.lat !== null && selectionMarker.lng !== null) {
-        selectionLocation = [selectionMarker.lng, selectionMarker.lat];
-        console.log('[DEBUG] Использованы координаты из состояния selectionMarker:', selectionLocation);
-      }
-      
-      // Сохраняем ссылку на маркер выбора перед удалением всех маркеров
-      const selectionMarkerRef = selectedMarkerRef.current;
-      
-      // Удаляем все существующие маркеры, кроме маркера выбора
-      Object.entries(markersRef.current).forEach(([key, marker]: [string, any]) => {
-        try {
-          if (marker && marker !== selectionMarkerRef && typeof marker.destroy === 'function') {
-            marker.destroy();
-          } else if (marker && marker !== selectionMarkerRef) {
-            console.log('[DEBUG] Маркер не имеет метода destroy, пропускаем');
-          }
-        } catch (e) {
-          console.error('Ошибка при удалении маркера:', e);
-        }
-      });
-      
-      // Сбрасываем список маркеров, но сохраняем маркер выбора если он есть
-      const newMarkersRef: {[key: string]: any} = {};
-      markersRef.current = newMarkersRef;
-      
-      // Очищаем кластеризатор если он есть
-      if (clustererRef.current) {
-        console.log('Очищаем кластеризатор...');
-        try {
-          // Пересоздаем кластеризатор для очистки
-          clustererRef.current.destroy();
-          clustererRef.current = new Clusterer(map, {
-            radius: 60,
-          });
-          console.log('Кластеризатор успешно пересоздан');
-        } catch (e) {
-          console.error('Ошибка при очистке кластеризатора:', e);
-        }
-      }
-      
-      // Создаем массивы для хранения маркеров
-      interface ClusterMarker {
-        coordinates: number[];
-        userData?: any;
-        icon?: string;
-        size?: number[];
-        anchor?: number[];
-      }
-      
-      const fireMarkers: ClusterMarker[] = [];
-      const stationMarkers: ClusterMarker[] = [];
-      
-      // Добавляем маркеры пожаров
-      const displayFires = fires.length > 0 ? fires : MOCK_FIRES;
-      const filteredFires = user?.role === 'station_dispatcher' && user.fireStationId
-        ? displayFires.filter(fire => fire.assignedStationId === user.fireStationId)
-        : displayFires;
-      
-      console.log(`Добавляем ${filteredFires.length} маркеров пожаров`);
-      
-      filteredFires.forEach(fire => {
-        // Проверяем валидность координат
-        if (!isValidLocation(fire.location)) {
-          console.error('Некорректные координаты для пожара:', fire);
-          return;
-        }
-        
-        try {
-          const markerKey = `fire-${fire.id}`;
-          // Координаты для 2GIS в формате [lng, lat]
-          const markerCoordinates = [fire.location[1], fire.location[0]];
-          
-          console.log(`Создаем маркер пожара #${fire.id} с координатами:`, markerCoordinates);
-          
-          // Проверяем валидность координат еще раз
-          if (isNaN(markerCoordinates[0]) || isNaN(markerCoordinates[1])) {
-            console.error(`Некорректные координаты для маркера пожара #${fire.id}:`, markerCoordinates);
-            return;
-          }
-          
-          // Создаем маркер для пожара
-          const marker = new mapgl.Marker(map, {
-            coordinates: markerCoordinates,
-            icon: FIRE_MARKER_OPTIONS.icon,
-            size: FIRE_MARKER_OPTIONS.size,
-            anchor: FIRE_MARKER_OPTIONS.anchor,
-            interactive: true, // явно указываем, что маркер интерактивный
-            userData: { id: fire.id, type: 'fire', data: fire } // данные маркера
-          });
-          
-          console.log(`[DEBUG] Создан маркер пожара #${fire.id} в точке:`, markerCoordinates);
-          
-          // ОТЛАДКА - добавляем данные из документации
-          console.log('[DEBUG] 2GIS Маркер создан:', {
-            hasMethod_on: typeof marker.on === 'function',
-            hasEvents: !!marker.events,
-            properties: Object.keys(marker).filter(prop => typeof marker[prop] !== 'function')
-          });
-          
-          // Сохраняем маркер в реф
-          markersRef.current[markerKey] = marker;
-          
-          // Добавляем маркер в массив для кластеризатора
-          fireMarkers.push({
-            coordinates: markerCoordinates,
-            userData: { id: fire.id, type: 'fire', data: fire },
-            icon: FIRE_MARKER_OPTIONS.icon,
-            size: FIRE_MARKER_OPTIONS.size,
-            anchor: FIRE_MARKER_OPTIONS.anchor
-          });
-          
-          // Добавляем обработчик клика на маркер
-          marker.on('click', () => {
-            try {
-              console.log(`[DEBUG] Клик по маркеру пожара #${fire.id}`);
-              
-              // Закрываем активный попап
-              closeActivePopup();
-              
-              // Валидируем координаты маркера
-              if (!markerCoordinates || isNaN(markerCoordinates[0]) || isNaN(markerCoordinates[1])) {
-                console.error('[DEBUG] Некорректные координаты маркера:', markerCoordinates);
-                return;
-              }
-              
-              // Вызываем колбэк выбора пожара
-              if (onFireSelect && fire) {
-                onFireSelect(fire);
-              }
-              
-              // Создаем HTML для попапа и показываем
-              showPopup(markerCoordinates, getFirePopupHtml(fire));
-            } catch (error) {
-              console.error('[DEBUG] Ошибка при обработке клика на маркер пожара:', error);
-            }
-          });
-        } catch (error) {
-          console.error('Ошибка при создании маркера для пожара:', fire, error);
-        }
-      });
-      
-      // Добавляем маркеры пожарных частей, если нужно
-      if (showStations) {
-        const displayStations = stations.length > 0 ? stations : MOCK_STATIONS;
-        const filteredStations = user?.role === 'station_dispatcher' && user.fireStationId
-          ? displayStations.filter(station => station.id === user.fireStationId)
-          : displayStations;
-        
-        console.log(`Добавляем ${filteredStations.length} маркеров пожарных частей`);
-        
-        filteredStations.forEach(station => {
-          // Проверяем валидность координат
-          if (!isValidLocation(station.location)) {
-            console.error('Некорректные координаты для пожарной части:', station);
-            return;
-          }
-          
-          try {
-            const markerKey = `station-${station.id}`;
-            // Координаты для 2GIS в формате [lng, lat]
-            const markerCoordinates = [station.location[1], station.location[0]];
             
-            console.log(`Создаем маркер станции #${station.id} с координатами:`, markerCoordinates);
-            
-            // Проверяем валидность координат еще раз
-            if (isNaN(markerCoordinates[0]) || isNaN(markerCoordinates[1])) {
-              console.error(`Некорректные координаты для маркера станции #${station.id}:`, markerCoordinates);
-              return;
-            }
-            
-            // Создаем маркер с явным указанием интерактивности
-            const marker = new mapgl.Marker(map, {
-              coordinates: markerCoordinates,
-              icon: STATION_MARKER_OPTIONS.icon,
-              size: STATION_MARKER_OPTIONS.size,
-              anchor: STATION_MARKER_OPTIONS.anchor,
-              interactive: true,
-              userData: { id: station.id, type: 'station', data: station }
-            });
-            
-            console.log(`[DEBUG] Создан маркер станции #${station.id} в точке:`, markerCoordinates);
-            
-            // Сохраняем маркер в реф
-            markersRef.current[markerKey] = marker;
-            
-            // Добавляем маркер в массив для кластеризатора
-            stationMarkers.push({
-              coordinates: markerCoordinates,
-              userData: { id: station.id, type: 'station', data: station },
-              icon: STATION_MARKER_OPTIONS.icon,
-              size: STATION_MARKER_OPTIONS.size,
-              anchor: STATION_MARKER_OPTIONS.anchor
-            });
-            
-            // Добавляем обработчик клика на маркер
-            marker.on('click', () => {
-              try {
-                console.log(`[DEBUG] Клик по маркеру станции #${station.id}`);
-                
-                // Закрываем активный попап
-                closeActivePopup();
-                
-                // Валидируем координаты маркера
-                if (!markerCoordinates || isNaN(markerCoordinates[0]) || isNaN(markerCoordinates[1])) {
-                  console.error('[DEBUG] Некорректные координаты маркера станции:', markerCoordinates);
-                  return;
-                }
-                
-                // Создаем HTML для попапа и показываем
-                showPopup(markerCoordinates, getStationPopupHtml(station));
-              } catch (error) {
-                console.error('[DEBUG] Ошибка при обработке клика на маркер станции:', error);
-              }
-            });
-          } catch (error) {
-            console.error('Ошибка при создании маркера для станции:', station, error);
-          }
-        });
-      }
-      
-      // Добавляем кластеры маркеров если есть кластеризатор
-      if (clustererRef.current) {
-        console.log(`[DEBUG] Добавляем ${fireMarkers.length} пожаров и ${stationMarkers.length} станций в кластеризатор`);
-        
-        try {
-          // Маркер выбора не должен кластеризоваться, поэтому не добавляем его в кластеризатор
-          const allMarkers = [...fireMarkers, ...stationMarkers].filter(marker => {
-            // Проверяем, не является ли маркер маркером выбора
-            if (marker.userData && marker.userData.type === 'selection') {
-              return false;
-            }
-            return true;
-          });
-          
-          clustererRef.current.load(allMarkers);
-          
-          // Добавляем обработчик клика на кластеризатор
-          clustererRef.current.on('click', (e: any) => {
-            try {
-              console.log('[DEBUG] Кластеризатор получил клик:', e);
+            // Получаем координаты клика
+            if (e && e.lngLat && Array.isArray(e.lngLat) && e.lngLat.length >= 2) {
+              const lng = e.lngLat[0];
+              const lat = e.lngLat[1];
+              console.log('[DEBUG] Координаты клика:', { lat, lng });
               
-              // Если клик по кластеру, увеличиваем зум
-              if (e.target && e.target.type === 'cluster') {
-                console.log('[DEBUG] Клик по кластеру', e.target);
-                if (e.target.coordinates && 
-                    Array.isArray(e.target.coordinates) && 
-                    e.target.coordinates.length >= 2 &&
-                    typeof e.target.coordinates[0] === 'number' && 
-                    typeof e.target.coordinates[1] === 'number') {
-                  const center = e.target.coordinates;
-                  map.setCenter(center);
-                  map.setZoom(map.getZoom() + 1);
-                }
-              }
-              // Если клик по маркеру в кластере
-              else if (e.target && e.target.type === 'marker') {
-                console.log('[DEBUG] Клик по маркеру в кластере', e.target);
-                const data = e.target.data;
-                
-                // Проверяем валидность данных и координат
-                if (!data || !data.coordinates || !Array.isArray(data.coordinates) || 
-                    data.coordinates.length < 2 || typeof data.coordinates[0] !== 'number' || 
-                    typeof data.coordinates[1] !== 'number' || !data.userData) {
-                  console.error('[DEBUG] Некорректные данные маркера в кластере:', data);
-                  return;
-                }
-                
-                const { type, id, data: markerData } = data.userData;
-                
-                if (type === 'fire' && markerData) {
-                  console.log('[DEBUG] Клик по маркеру пожара в кластере', markerData);
-                  
-                  // Закрываем активный попап
-                  closeActivePopup();
-                  
-                  // Вызываем колбэк выбора пожара
-                  if (onFireSelect) {
-                    onFireSelect(markerData);
+              // Если разрешено создание пожара и передан обработчик выбора локации
+              if (allowCreation && onLocationSelect) {
+                // Удаляем предыдущий маркер выбора если он есть
+                if (selectedMarkerRef.current) {
+                  try {
+                    selectedMarkerRef.current.destroy();
+                  } catch (err) {
+                    console.error('[DEBUG] Ошибка при удалении предыдущего маркера:', err);
                   }
-                  
-                  // Показываем попап
-                  showPopup(data.coordinates, getFirePopupHtml(markerData));
-                } 
-                else if (type === 'station' && markerData) {
-                  console.log('[DEBUG] Клик по маркеру станции в кластере', markerData);
-                  
-                  // Закрываем активный попап
-                  closeActivePopup();
-                  
-                  // Показываем попап
-                  showPopup(data.coordinates, getStationPopupHtml(markerData));
+                  selectedMarkerRef.current = null;
                 }
+                
+                try {
+                  // Создаем новый маркер выбора
+                  closeActivePopup(); // Закрываем любые активные попапы
+                  
+                  const marker = new mapgl.Marker(map, {
+                    coordinates: [lng, lat],
+                    icon: SELECTION_MARKER_OPTIONS.icon,
+                    size: SELECTION_MARKER_OPTIONS.size,
+                    anchor: SELECTION_MARKER_OPTIONS.anchor,
+                    userData: { type: 'selection', id: 'selection-marker' },
+                    zIndex: 1000
+                  });
+                  
+                  // Сохраняем маркер
+                  selectedMarkerRef.current = marker;
+                  
+                  // Сохраняем в состоянии выбранную локацию
+                  setSelectionMarker({
+                    visible: true,
+                    lat: lat,
+                    lng: lng
+                  });
+                  
+                  // Показываем попап с информацией
+                  showPopup(
+                    [lng, lat],
+                    `<div style="padding: 5px;">
+                      <div style="font-weight: bold; margin: 0 0 5px; color: #ff9800; font-size: 16px;">Выбранное место</div>
+                      <div style="margin: 0 0 5px;">Координаты: ${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+                      <div style="font-size: 12px; color: #666;">Для создания пожара нажмите "Отметить пожар"</div>
+                    </div>`
+                  );
+
+                  // Успешное уведомление через toast
+                  toast({
+                    title: 'Местоположение выбрано',
+                    description: 'Нажмите "Отметить пожар", чтобы продолжить',
+                    variant: 'default'
+                  });
+                  
+                  // Вызываем переданный обработчик выбора локации
+                  onLocationSelect(lat, lng);
+                } catch (markerError) {
+                  console.error('[DEBUG] Ошибка при создании маркера выбора:', markerError);
+                  toast({
+                    title: 'Ошибка',
+                    description: 'Не удалось отметить позицию на карте. Попробуйте еще раз.',
+                    variant: 'destructive'
+                  });
+                }
+              } else {
+                console.log('[DEBUG] Создание пожара не разрешено или не передан обработчик');
               }
-            } catch (error) {
-              console.error('[DEBUG] Ошибка при обработке клика на кластеризаторе:', error);
+            } else {
+              console.error('[DEBUG] Некорректные координаты клика:', e);
             }
           });
-          
-          console.log('Маркеры успешно загружены в кластеризатор');
-        } catch (e) {
-          console.error('[DEBUG] Ошибка при добавлении маркеров в кластеризатор:', e);
+        } catch (mapError: any) {
+          console.error('[DEBUG] Ошибка при создании экземпляра карты:', mapError);
+          setError(`Ошибка при создании карты: ${mapError.message || 'Неизвестная ошибка'}`);
         }
-      } else {
-        console.log('Кластеризатор не инициализирован');
-      }
-      
-      // После добавления всех маркеров пожаров и станций, добавляем маркер выбора обратно, если он был
-      if (selectionLocation) {
-        try {
-          console.log('[DEBUG] Создаем/восстанавливаем маркер выбора в координатах:', selectionLocation);
-          
-          // Создаем новый маркер выбора на основе сохраненных координат
-          const selectionMarker = new mapgl.Marker(map, {
-            coordinates: selectionLocation,
-            icon: SELECTION_MARKER_OPTIONS.icon,
-            size: SELECTION_MARKER_OPTIONS.size,
-            anchor: SELECTION_MARKER_OPTIONS.anchor,
-            userData: { type: 'selection', id: 'selection-marker' },
-            interactive: true,
-            zIndex: 1000 // высокий z-index чтобы он был поверх других маркеров
-          });
-          
-          // Сохраняем маркер в обоих рефах
-          selectedMarkerRef.current = selectionMarker;
-          markersRef.current['selection'] = selectionMarker;
-          
-          // Сохраняем оригинальные координаты
-          markersRef.current['selection'].selectionLocation = selectionLocation;
-          
-          console.log('[DEBUG] Маркер выбора успешно создан/восстановлен');
-          
-          // Добавляем обработчик клика на маркер
-          if (typeof selectionMarker.on === 'function') {
-            selectionMarker.on('click', () => {
-              // Показываем попап при клике на маркер
-              const [lng, lat] = selectionLocation;
-              showPopup(
-                selectionLocation,
-                `<div style="padding: 5px;">
-                  <div style="font-weight: bold; margin: 0 0 5px; color: #ff9800; font-size: 16px;">Выбранное место</div>
-                  <div style="margin: 0 0 5px;">Координаты: ${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
-                  <div style="font-size: 12px; color: #666;">Для создания пожара нажмите \"Отметить пожар\"</div>
-                </div>`
-              );
-            });
-          }
-        } catch (e) {
-          console.error('[DEBUG] Ошибка при добавлении маркера выбора обратно:', e);
+      } catch (sdkError: any) {
+        console.error('[DEBUG] Ошибка при загрузке SDK 2GIS:', sdkError);
+        if (isMounted) {
+          setError(`Ошибка при загрузке SDK карты: ${sdkError.message || 'Неизвестная ошибка'}`);
         }
       }
     }
     
     // Инициализируем карту
+    console.log('[DEBUG] Вызываем функцию initMap()');
     initMap();
-
-    // Исследуем API карты для нахождения метода создания попапа
-    setTimeout(() => {
-      try {
-        console.log('[DEBUG] Исследуем API карты для попапов');
-        const map = mapInstanceRef.current;
-        const mapgl = MapGLRef.current;
-        
-        if (map) {
-          console.log('[DEBUG] Методы карты:', Object.keys(map).filter(k => typeof map[k] === 'function'));
-          console.log('[DEBUG] Свойства карты:', Object.keys(map).filter(k => typeof map[k] !== 'function'));
-          
-          // Проверяем наличие методов попапа
-          if (typeof map.createPopup === 'function') {
-            console.log('[DEBUG] map.createPopup доступен');
-          }
-          if (typeof map.showPopup === 'function') {
-            console.log('[DEBUG] map.showPopup доступен');
-          }
-          if (typeof map.popup === 'function') {
-            console.log('[DEBUG] map.popup доступен');
-          }
-        }
-        
-        if (mapgl) {
-          console.log('[DEBUG] API модули mapgl:', Object.keys(mapgl));
-          
-          // Проверяем наличие класса Popup в API
-          if (mapgl.Popup) {
-            console.log('[DEBUG] mapgl.Popup доступен:', mapgl.Popup);
-          }
-          if (mapgl.InfoPopup) {
-            console.log('[DEBUG] mapgl.InfoPopup доступен:', mapgl.InfoPopup);
-          }
-        }
-      } catch (e) {
-        console.error('[DEBUG] Ошибка при исследовании API карты:', e);
-      }
-    }, 1000);
-    
-    // Добавляем интервал обновления маркеров
-    // Уменьшаем частоту обновления до 30 секунд, чтобы не создавать лишнюю нагрузку
-    // Примечание: Отключаем обновление при создании маркера выбора, чтобы избежать перезаписи
-    const updateTimer = setInterval(() => {
-      console.log('Запланированное обновление маркеров...');
-      if (!selectedMarkerRef.current) {
-        addMarkers();
-      } else {
-        console.log('[DEBUG] Пропускаем обновление маркеров, так как есть активный маркер выбора');
-      }
-    }, 30000);
     
     // Очистка при размонтировании
     return () => {
-      clearInterval(updateTimer);
+      console.log('[DEBUG] Очистка компонента карты');
+      isMounted = false;
       
-      // Закрываем активный попап
-      closeActivePopup();
-      
-      // Очищаем все попапы на странице
-      try {
-        const popups = document.querySelectorAll('.mapgl-popup-wrapper, .mapgl-popup-container, .popup-container');
-        if (popups.length > 0) {
-          console.log(`[DEBUG] Удаляем ${popups.length} DOM-элементов попапов при размонтировании`);
-          popups.forEach(popup => {
-            if (popup.parentNode) {
-              popup.parentNode.removeChild(popup);
-            }
-          });
-        }
-      } catch (e) {
-        console.error('[DEBUG] Ошибка при удалении DOM-элементов попапов:', e);
-      }
-      
-      // Очищаем кластеризатор, если он существует
-      if (clustererRef.current) {
-        try {
-          clustererRef.current.destroy();
-          console.log('[DEBUG] Кластеризатор удален');
-        } catch (e) {
-          console.error('[DEBUG] Ошибка при удалении кластеризатора:', e);
-        }
-        clustererRef.current = null;
-      }
-      
-      // Удаляем все маркеры
-      Object.values(markersRef.current).forEach((marker: any) => {
-        try {
-          if (marker && typeof marker.destroy === 'function') {
-            marker.destroy();
-          } else {
-            console.log('[DEBUG] Маркер не имеет метода destroy, пропускаем');
-          }
-        } catch (e) {
-          console.error('[DEBUG] Ошибка при удалении маркера:', e);
-        }
-      });
-      markersRef.current = {};
-      
-      // Удаляем маркер выбранного местоположения
-      if (selectedMarkerRef.current) {
-        try {
-          if (typeof selectedMarkerRef.current.destroy === 'function') {
-            selectedMarkerRef.current.destroy();
-          } else {
-            console.log('[DEBUG] Маркер не имеет метода destroy, возможно, он создан через кластеризатор');
-          }
-        } catch (err) {
-          console.error('[DEBUG] Ошибка при удалении маркера выбора:', err);
-        }
-        selectedMarkerRef.current = null;
-      }
-      
-      // Уничтожаем карту
+      // Уничтожаем карту при размонтировании
       if (mapInstanceRef.current) {
         try {
           mapInstanceRef.current.destroy();
-          console.log('[DEBUG] Карта уничтожена');
+          console.log('[DEBUG] Карта успешно уничтожена');
         } catch (e) {
           console.error('[DEBUG] Ошибка при уничтожении карты:', e);
         }
-        mapInstanceRef.current = null;
-      }
-      
-      // Окончательная очистка - удаляем все элементы 2GIS из DOM
-      try {
-        const gisElements = document.querySelectorAll('.mapgl-canvas-container, .mapgl-controls-container');
-        if (gisElements.length > 0) {
-          console.log(`[DEBUG] Удаляем ${gisElements.length} DOM-элементов 2GIS при размонтировании`);
-          gisElements.forEach(element => {
-            if (element.parentNode) {
-              element.parentNode.removeChild(element);
-            }
-          });
-        }
-      } catch (e) {
-        console.error('[DEBUG] Ошибка при удалении DOM-элементов 2GIS:', e);
       }
     };
-  }, [
-    API_KEY,
-    allowCreation,
-    fires,
-    initialCenter,
-    mapCenter,
-    mapZoom,
-    onFireSelect,
-    onLocationSelect,
-    showStations,
-    stations,
-    user,
-    zoom
-  ]);
+  }, [onLocationSelect, allowCreation, mapCenter, mapZoom]);
 
   // После инициализации компонента, добавим обработчик клика на контейнере карты
   useEffect(() => {
@@ -1071,63 +493,141 @@ export default function FireMap({
 
   // Функция для перевода статуса пожара
   const translateFireStatus = (status: string): string => {
-    switch (status) {
-      case 'active':
-        return 'Активный';
-      case 'investigating':
-        return 'Исследование';
-      case 'dispatched':
-        return 'Отправлен';
-      case 'resolved':
-        return 'Потушен';
-      default:
-        return status;
-    }
+    // Если есть готовый человекочитаемый статус, используем его
+    if (status === 'PENDING') return 'Ожидает обработки';
+    if (status === 'IN_PROGRESS') return 'В процессе тушения';
+    if (status === 'RESOLVED') return 'Потушен';
+    if (status === 'CANCELLED') return 'Отменен';
+    return status;
   };
 
-  // Общий HTML для попапа пожара
+  // Функция для получения координат пожара (совместима с обоими форматами)
+  const getFireCoordinates = (fire: any): { lat: number, lng: number } => {
+    if (fire.latitude !== undefined && fire.longitude !== undefined) {
+      return { lat: fire.latitude, lng: fire.longitude };
+    } else if (fire.location && Array.isArray(fire.location) && fire.location.length >= 2) {
+      // В location формат [lng, lat]
+      return { lat: fire.location[1], lng: fire.location[0] };
+    }
+    // Значение по умолчанию
+    return { lat: 52.05, lng: 113.47 }; // Координаты центра Читы
+  };
+
+  // Функция для получения названия уровня пожара
+  const getFireLevelInfo = (fire: any): { level: string, name: string, description: string } => {
+    if (fire.level?.name) {
+      return {
+        level: fire.level.name,
+        name: fire.level.name,
+        description: fire.level.description || ''
+      };
+    } else if (fire.fireLevel?.name) {
+      return {
+        level: fire.fireLevel.level.toString(),
+        name: fire.fireLevel.name,
+        description: fire.fireLevel.description || ''
+      };
+    }
+    return { level: fire.levelId?.toString() || '?', name: 'Уровень ' + (fire.levelId || '?'), description: '' };
+  };
+
+  // Функция для получения имени станции
+  const getFireStationName = (fire: any): string => {
+    if (fire.assignedStation?.name) {
+      return fire.assignedStation.name;
+    } else if (fire.fireStation?.name) {
+      return fire.fireStation.name;
+    }
+    return 'Не назначена';
+  };
+
   const getFirePopupHtml = (fire: any) => {
-    // Проверяем наличие необходимых свойств
-    const hasLevel = fire.level && (fire.level.name || fire.levelId);
-    const levelText = hasLevel ? `${fire.level?.name || fire.levelId}` : 'Не указан';
+    // Форматируем время создания
+    const createdAt = new Date(fire.createdAt).toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
     
-    const statusText = fire.status ? translateFireStatus(fire.status) : 'Не указан';
+    // Используем readableStatus если он есть, иначе переводим вручную
+    const status = fire.readableStatus || translateFireStatus(fire.status);
     
-    const hasDate = fire.createdAt && !isNaN(new Date(fire.createdAt).getTime());
-    const dateText = hasDate ? new Date(fire.createdAt).toLocaleString() : 'Не указана';
+    // Получаем информацию об уровне пожара
+    const fireLevel = getFireLevelInfo(fire);
     
-    const hasStation = fire.assignedStationId && (fire.assignedStation?.name || fire.assignedStationId);
-    const stationText = hasStation ? `<div style="margin: 0;">Назначен части: ${fire.assignedStation?.name || fire.assignedStationId}</div>` : '';
+    // Получаем координаты
+    const coordinates = getFireCoordinates(fire);
     
     return `
-      <div style="padding: 5px;">
-        <div style="font-weight: bold; margin: 0 0 5px; color: #d32f2f; font-size: 16px;">Пожар #${fire.id || 'Новый'}</div>
-        <div style="margin: 0 0 5px;">Уровень: ${levelText}</div>
-        <div style="margin: 0 0 5px;">Статус: ${statusText}</div>
-        <div style="margin: 0 0 5px;">Создан: ${dateText}</div>
-        ${stationText}
+      <div style="padding: 10px; max-width: 300px;">
+        <div style="font-weight: bold; margin: 0 0 5px; color: #f44336; font-size: 16px;">
+          Пожар #${fire.id}
+        </div>
+        <div style="margin: 0 0 3px; display: flex;">
+          <span style="font-weight: bold; margin-right: 5px;">Статус:</span>
+          <span style="color: ${
+            fire.status === 'PENDING' ? '#ff9800' : 
+            fire.status === 'IN_PROGRESS' ? '#f44336' : 
+            fire.status === 'RESOLVED' ? '#4caf50' : 
+            fire.status === 'CANCELLED' ? '#9e9e9e' : '#2196f3'
+          };">${status}</span>
+        </div>
+        <div style="margin: 0 0 3px; display: flex;">
+          <span style="font-weight: bold; margin-right: 5px;">Уровень:</span>
+          <span style="color: #1976d2;">${fireLevel.level} - ${fireLevel.name}</span>
+        </div>
+        <div style="margin: 0 0 3px; display: flex;">
+          <span style="font-weight: bold; margin-right: 5px;">Создан:</span>
+          <span>${createdAt}</span>
+        </div>
+        ${fire.address ? `<div style="margin: 0 0 3px; display: flex;">
+          <span style="font-weight: bold; margin-right: 5px;">Адрес:</span>
+          <span>${fire.address}</span>
+        </div>` : ''}
+        ${fire.description ? `<div style="margin: 0 0 3px; display: flex;">
+          <span style="font-weight: bold; margin-right: 5px;">Описание:</span>
+          <span>${fire.description}</span>
+        </div>` : ''}
+        <div style="margin: 0 0 3px;">
+          <span style="font-weight: bold; margin-right: 5px;">Пожарная часть:</span>
+          <span>${getFireStationName(fire)}</span>
+        </div>
+        <div style="font-size: 12px; color: #666; margin-top: 8px;">
+          Координаты: ${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}
+        </div>
       </div>
     `;
   };
 
   // Общий HTML для попапа станции
   const getStationPopupHtml = (station: any) => {
-    // Проверяем валидность location и его значений
-    const locationValid = station.location && 
-      Array.isArray(station.location) && 
-      station.location.length >= 2 &&
-      typeof station.location[0] === 'number' && 
-      typeof station.location[1] === 'number';
+    // Проверяем валидность координат станции
+    const hasValidCoordinates = 
+      (station.latitude !== undefined && station.longitude !== undefined && 
+       !isNaN(station.latitude) && !isNaN(station.longitude))
+      ||
+      (station.location && Array.isArray(station.location) && 
+       station.location.length >= 2 && 
+       typeof station.location[0] === 'number' && 
+       typeof station.location[1] === 'number');
     
-    const coordinates = locationValid 
-      ? `${station.location[0].toFixed(6)}, ${station.location[1].toFixed(6)}`
-      : 'Координаты не указаны';
+    let coordinatesText = 'Координаты не указаны';
+    
+    if (hasValidCoordinates) {
+      if (station.latitude !== undefined && station.longitude !== undefined) {
+        coordinatesText = `${station.latitude.toFixed(6)}, ${station.longitude.toFixed(6)}`;
+      } else if (station.location) {
+        coordinatesText = `${station.location[0].toFixed(6)}, ${station.location[1].toFixed(6)}`;
+      }
+    }
       
     return `
       <div style="padding: 5px;">
         <div style="font-weight: bold; margin: 0 0 5px; color: #1976d2; font-size: 16px;">Часть: ${station.name || 'Без названия'}</div>
         <div style="margin: 0 0 5px;">ID: ${station.id || 'Неизвестно'}</div>
-        <div style="margin: 0;">Координаты: ${coordinates}</div>
+        <div style="margin: 0;">Координаты: ${coordinatesText}</div>
       </div>
     `;
   };
@@ -1232,6 +732,7 @@ export default function FireMap({
           close: () => {
             try {
               htmlMarker.destroy();
+              console.log('[DEBUG] Попап закрыт успешно');
             } catch (e) {
               console.error('[DEBUG] Ошибка при закрытии HtmlMarker:', e);
             }
@@ -1249,49 +750,6 @@ export default function FireMap({
         if (!isVisible) {
           console.log('[DEBUG] showPopup: Маркер не виден на карте, перемещаем карту');
           map.setCenter(coordinates);
-          
-          // Добавляем небольшую задержку для анимации центрирования
-          setTimeout(() => {
-            // Делаем маркер еще заметнее, добавляя дополнительный акцент
-            const flashElement = document.createElement('div');
-            flashElement.style.position = 'absolute';
-            flashElement.style.width = '50px';
-            flashElement.style.height = '50px';
-            flashElement.style.borderRadius = '50%';
-            flashElement.style.background = 'rgba(255, 152, 0, 0.3)';
-            flashElement.style.transform = 'translate(-50%, -50%)';
-            flashElement.style.pointerEvents = 'none'; // Чтобы не мешать кликам
-            flashElement.style.animation = 'flash 1s ease-out';
-            
-            // Добавляем стиль анимации вспышки
-            if (!document.getElementById('flash-animation-style')) {
-              const style = document.createElement('style');
-              style.id = 'flash-animation-style';
-              style.textContent = `
-                @keyframes flash {
-                  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
-                  100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
-                }
-              `;
-              document.head.appendChild(style);
-            }
-            
-            // Создаем временный маркер для эффекта вспышки
-            const flashMarker = new mapgl.HtmlMarker(map, {
-              coordinates: coordinates,
-              html: flashElement,
-              zIndex: 999
-            });
-            
-            // Удаляем маркер вспышки через 1 секунду
-            setTimeout(() => {
-              try {
-                flashMarker.destroy();
-              } catch (e) {
-                console.error('[DEBUG] Ошибка при удалении маркера вспышки:', e);
-              }
-            }, 1000);
-          }, 300);
         }
       } catch (err) {
         console.error('[DEBUG] showPopup: Ошибка при создании/отображении попапа:', err);
@@ -1411,7 +869,6 @@ export default function FireMap({
           console.error('[DEBUG] Ошибка при удалении предыдущего маркера:', err);
         }
         selectedMarkerRef.current = null;
-        delete markersRef.current['selection'];
       }
       
       // Преобразуем координаты для 2GIS (lat, lng) -> (lng, lat)
@@ -1473,6 +930,179 @@ export default function FireMap({
     }
   };
 
+  // Инициализация маркеров при изменении данных о пожарах и станциях
+  useEffect(() => {
+    console.log('[DEBUG] Отслеживаем изменения в fires и stations:', {
+      firesLength: fires.length,
+      stationsLength: stations.length,
+      mapInitialized,
+      userRole: user?.role
+    });
+    
+    // Если карта не инициализирована или нет данных, выходим
+    if (!mapInitialized || !mapInstanceRef.current || !MapGLRef.current) {
+      console.log('[DEBUG] Карта не инициализирована или нет данных для отображения маркеров');
+      return;
+    }
+
+    // Получаем экземпляры карты и API
+    const map = mapInstanceRef.current;
+    const mapgl = MapGLRef.current;
+    
+    // Очищаем все текущие маркеры
+    console.log('[DEBUG] Очищаем текущие маркеры перед добавлением новых');
+    Object.values(markersRef.current).forEach((marker: any) => {
+      try {
+        marker.destroy();
+      } catch (e) {
+        console.error('[DEBUG] Ошибка при очистке маркера:', e);
+      }
+    });
+    markersRef.current = {};
+    
+    // Дополнительно фильтруем пожары для диспетчера станции
+    let firesForDisplay = [...fires];
+    
+    // Для диспетчера станции дополнительно проверяем, что пожары относятся к его станции
+    if (user?.role === 'station_dispatcher' && user?.fireStationId) {
+      console.log(`[DEBUG] Дополнительно фильтруем пожары для диспетчера станции ${user.fireStationId}`);
+      firesForDisplay = firesForDisplay.filter(fire => 
+        fire.assignedStationId === user.fireStationId
+      );
+      console.log(`[DEBUG] После фильтрации для диспетчера станции осталось ${firesForDisplay.length} пожаров`);
+    }
+    
+    // Фильтруем, чтобы не показывать потушенные пожары
+    const activeFiresOnly = firesForDisplay.filter(fire => 
+      fire.status !== 'RESOLVED'
+    );
+    
+    console.log('[DEBUG] Добавляем маркеры активных пожаров:', activeFiresOnly.length, 'из', fires.length);
+    
+    // Добавляем маркеры для пожаров
+    if (activeFiresOnly.length > 0) {
+      activeFiresOnly.forEach((fire) => {
+        // Проверяем разные форматы координат
+        let fireCoordinates: [number, number] | null = null;
+        
+        if (fire.location && Array.isArray(fire.location) && fire.location.length >= 2) {
+          // Формат [lat, lng] -> [lng, lat] для 2GIS
+          fireCoordinates = [fire.location[1], fire.location[0]];
+        } else if (fire.latitude !== undefined && fire.longitude !== undefined) {
+          // Формат {latitude, longitude} -> [lng, lat] для 2GIS
+          fireCoordinates = [fire.longitude, fire.latitude];
+        }
+        
+        if (!fireCoordinates) {
+          console.warn('[DEBUG] Некорректные координаты пожара:', fire);
+          return;
+        }
+        
+        try {
+          // Создаем маркер для пожара
+          const fireMarker = new mapgl.Marker(map, {
+            coordinates: fireCoordinates,
+            icon: FIRE_MARKER_OPTIONS.icon,
+            size: FIRE_MARKER_OPTIONS.size,
+            anchor: FIRE_MARKER_OPTIONS.anchor,
+            userData: { type: 'fire', id: fire.id },
+            zIndex: 500
+          });
+          
+          // Добавляем обработчик клика для маркера
+          fireMarker.on('click', () => {
+            console.log(`[DEBUG] Клик по маркеру пожара #${fire.id}`);
+            
+            // Закрываем активный попап
+            closeActivePopup();
+            
+            // Вызываем колбэк выбора пожара если есть
+            if (onFireSelect) {
+              console.log('[DEBUG] Вызываем onFireSelect с пожаром:', fire);
+              onFireSelect(fire);
+            }
+            
+            // Показываем попап с информацией о пожаре
+            showPopup(fireCoordinates as [number, number], getFirePopupHtml(fire));
+          });
+          
+          // Сохраняем маркер в реф
+          markersRef.current[`fire-${fire.id}`] = fireMarker;
+          console.log(`[DEBUG] Добавлен маркер пожара #${fire.id} в координатах:`, fireCoordinates);
+        } catch (e) {
+          console.error(`[DEBUG] Ошибка при создании маркера пожара #${fire.id}:`, e);
+        }
+      });
+    } else {
+      console.log('[DEBUG] Нет данных о пожарах для отображения');
+    }
+    
+    // Дополнительно фильтруем пожарные части для диспетчера станции
+    let stationsForDisplay = [...stations];
+    
+    // Для диспетчера станции показываем только его станцию
+    if (user?.role === 'station_dispatcher' && user?.fireStationId) {
+      console.log(`[DEBUG] Дополнительно фильтруем станции для диспетчера станции ${user.fireStationId}`);
+      stationsForDisplay = stationsForDisplay.filter(station => 
+        station.id === user.fireStationId
+      );
+      console.log(`[DEBUG] После фильтрации для диспетчера станции осталось ${stationsForDisplay.length} станций`);
+    }
+    
+    // Добавляем маркеры для пожарных частей если нужно
+    if (showStations && stationsForDisplay.length > 0) {
+      console.log('[DEBUG] Добавляем маркеры пожарных частей:', stationsForDisplay.length);
+      stationsForDisplay.forEach((station) => {
+        // Проверяем разные форматы координат
+        let stationCoordinates: [number, number] | null = null;
+        
+        if (station.location && Array.isArray(station.location) && station.location.length >= 2) {
+          // Формат [lat, lng] -> [lng, lat] для 2GIS
+          stationCoordinates = [station.location[1], station.location[0]];
+        } else if (station.latitude !== undefined && station.longitude !== undefined) {
+          // Формат {latitude, longitude} -> [lng, lat] для 2GIS
+          stationCoordinates = [station.longitude, station.latitude];
+        }
+        
+        if (!stationCoordinates) {
+          console.warn('[DEBUG] Некорректные координаты станции:', station);
+          return;
+        }
+        
+        try {
+          // Создаем маркер для станции
+          const stationMarker = new mapgl.Marker(map, {
+            coordinates: stationCoordinates,
+            icon: STATION_MARKER_OPTIONS.icon,
+            size: STATION_MARKER_OPTIONS.size,
+            anchor: STATION_MARKER_OPTIONS.anchor,
+            userData: { type: 'station', id: station.id },
+            zIndex: 400
+          });
+          
+          // Добавляем обработчик клика для маркера
+          stationMarker.on('click', () => {
+            console.log(`[DEBUG] Клик по маркеру станции #${station.id}`);
+            
+            // Закрываем активный попап
+            closeActivePopup();
+            
+            // Показываем попап с информацией о пожарной части
+            showPopup(stationCoordinates as [number, number], getStationPopupHtml(station));
+          });
+          
+          // Сохраняем маркер в реф
+          markersRef.current[`station-${station.id}`] = stationMarker;
+          console.log(`[DEBUG] Добавлен маркер станции #${station.id} в координатах:`, stationCoordinates);
+        } catch (e) {
+          console.error(`[DEBUG] Ошибка при создании маркера станции #${station.id}:`, e);
+        }
+      });
+    } else {
+      console.log('[DEBUG] Отображение маркеров станций отключено или нет данных');
+    }
+  }, [fires, stations, mapInitialized, showStations, closeActivePopup, getFirePopupHtml, getStationPopupHtml, onFireSelect, user]);
+
   return (
     <div className="h-full w-full relative">
       {allowCreation && (
@@ -1486,6 +1116,31 @@ export default function FireMap({
         </div>
       )}
       <div ref={mapContainerRef} className="h-full w-full" />
+      
+      {/* Индикатор загрузки или ошибки */}
+      {!mapInitialized && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+          <div className="bg-white rounded-lg shadow-lg p-4 text-center max-w-md">
+            {error ? (
+              <>
+                <div className="text-red-600 text-xl mb-2">Ошибка</div>
+                <div className="text-gray-800">{error}</div>
+                <button 
+                  className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                  onClick={() => window.location.reload()}
+                >
+                  Перезагрузить страницу
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600 mx-auto mb-4"></div>
+                <div className="text-gray-800">{loadingStep}</div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

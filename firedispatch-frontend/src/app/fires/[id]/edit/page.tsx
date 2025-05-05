@@ -21,17 +21,36 @@ const MARKER_OPTIONS = {
 
 interface Fire {
   id: number;
-  latitude: number;
-  longitude: number;
-  address: string;
+  latitude?: number;
+  longitude?: number;
+  location?: [number, number]; // [longitude, latitude]
+  address?: string;
   levelId: number;
   level?: {
     id: number;
     name: string;
     description: string;
   };
+  // Поля от бэкенда
+  fireLevel?: {
+    id: number;
+    level: number;
+    name: string;
+    description?: string;
+  };
   status: string;
-  assignedStationId: number | null;
+  assignedStationId?: number | null;
+  assignedStation?: {
+    id: number;
+    name: string;
+    address?: string;
+  };
+  // Поля от бэкенда
+  fireStation?: {
+    id: number;
+    name: string;
+    address?: string;
+  };
 }
 
 interface FireLevel {
@@ -47,6 +66,19 @@ interface FireStation {
   latitude: number;
   longitude: number;
 }
+
+// Функция-помощник для извлечения координат
+const getCoordinates = (fire: Fire): [number, number] => {
+  if (fire.latitude !== undefined && fire.longitude !== undefined) {
+    return [fire.latitude, fire.longitude];
+  } 
+  if (fire.location) {
+    // location в формате [lng, lat], а position в формате [lat, lng]
+    return [fire.location[1], fire.location[0]];
+  }
+  // Значение по умолчанию - центр Читы
+  return [52.0515, 113.4712];
+};
 
 export default function EditFirePage() {
   const { id } = useParams();
@@ -79,9 +111,9 @@ export default function EditFirePage() {
         setLoading(true);
         
         // В реальном приложении здесь были бы запросы к API
-        const response = await api.get(`/fires/${id}`);
-        const levelsResponse = await api.get('/fire-levels');
-        const stationsResponse = await api.get('/fire-stations');
+        const response = await api.get(`/api/fire/${id}`);
+        const levelsResponse = await api.get('/api/fire-level');
+        const stationsResponse = await api.get('/api/fire-station');
         
         const fire = response.data;
         const fireLevels = levelsResponse.data;
@@ -90,7 +122,7 @@ export default function EditFirePage() {
         // Проверка прав доступа
         const isDispatcher = user?.role === 'central_dispatcher' || user?.role === 'station_dispatcher';
         const isStationDispatcherForThisFire = user?.role === 'station_dispatcher' && 
-          user.fireStationId === fire.assignedStationId;
+          user.fireStationId === (fire.assignedStationId || fire.fireStationId);
           
         if (!isDispatcher || (user?.role === 'station_dispatcher' && !isStationDispatcherForThisFire)) {
           setUnauthorizedAccess(true);
@@ -100,12 +132,15 @@ export default function EditFirePage() {
         setFireLevels(fireLevels);
         setFireStations(fireStations);
         
+        // Получаем координаты пожара
+        const firePosition = getCoordinates(fire);
+        
         // Заполнение формы данными
-        setPosition([fire.latitude, fire.longitude]);
-        setAddress(fire.address);
+        setPosition(firePosition);
+        setAddress(fire.address || '');
         setLevelId(fire.levelId);
         setStatus(fire.status);
-        setAssignedStationId(fire.assignedStationId);
+        setAssignedStationId(fire.assignedStationId || fire.fireStationId || null);
       } catch (error) {
         console.error('Error fetching fire data:', error);
         toast.error('Ошибка при загрузке данных о пожаре');
@@ -219,13 +254,13 @@ export default function EditFirePage() {
     try {
       setIsSubmitting(true);
       
-      await api.put(`/fires/${id}`, {
-        latitude: position[0],
-        longitude: position[1],
+      await api.put(`/api/fire/${id}`, {
+        location: [position[1], position[0]], // Меняем формат на [longitude, latitude]
         address,
         levelId,
-        status,
-        assignedStationId
+        status: status.toUpperCase(), // Приводим к верхнему регистру для соответствия enum на бэкенде
+        assignedStationId,
+        reportedById: user?.id // Используем id вместо userId
       });
       
       toast.success('Данные о пожаре успешно обновлены');
@@ -242,10 +277,10 @@ export default function EditFirePage() {
   
   // Статусы пожара
   const fireStatuses = [
-    { value: 'active', label: 'Активный' },
-    { value: 'investigating', label: 'Разведка' },
-    { value: 'dispatched', label: 'Отправлен' },
-    { value: 'resolved', label: 'Потушен' }
+    { value: 'pending', label: 'Ожидает обработки' },
+    { value: 'in_progress', label: 'В процессе тушения' },
+    { value: 'resolved', label: 'Потушен' },
+    { value: 'cancelled', label: 'Отменен' }
   ];
 
   // Если недостаточно прав

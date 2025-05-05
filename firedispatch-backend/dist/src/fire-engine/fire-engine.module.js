@@ -10,13 +10,16 @@ exports.FireEngineModule = void 0;
 const common_1 = require("@nestjs/common");
 const fire_engine_service_1 = require("./fire-engine.service");
 const fire_engine_controller_1 = require("./fire-engine.controller");
+const engine_type_controller_1 = require("./engine-type.controller");
+const prisma_module_1 = require("../prisma/prisma.module");
 let FireEngineModule = class FireEngineModule {
 };
 exports.FireEngineModule = FireEngineModule;
 exports.FireEngineModule = FireEngineModule = __decorate([
     (0, common_1.Module)({
+        imports: [prisma_module_1.PrismaModule],
         providers: [fire_engine_service_1.FireEngineService],
-        controllers: [fire_engine_controller_1.FireEngineController]
+        controllers: [fire_engine_controller_1.FireEngineController, engine_type_controller_1.EngineTypeController]
     })
 ], FireEngineModule);
 //# sourceMappingURL=fire-engine.module.js.map

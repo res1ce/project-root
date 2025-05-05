@@ -38,6 +38,7 @@ export default function UsersAdminPage() {
   const [stations, setStations] = useState<FireStation[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddingUser, setIsAddingUser] = useState(false);
+  const [isEditingUser, setIsEditingUser] = useState(false);
   
   // Новый пользователь
   const [newUsername, setNewUsername] = useState('');
@@ -45,77 +46,36 @@ export default function UsersAdminPage() {
   const [newRoleId, setNewRoleId] = useState(0);
   const [newFireStationId, setNewFireStationId] = useState<number | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Редактируемый пользователь
+  const [editUserId, setEditUserId] = useState<number | null>(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editRoleId, setEditRoleId] = useState(0);
+  const [editFireStationId, setEditFireStationId] = useState<number | undefined>(undefined);
 
   // Получение данных
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Запросы к API
+      const usersResponse = await api.get('/api/user');
+      const rolesResponse = await api.get('/api/role');
+      const stationsResponse = await api.get('/api/fire-station');
+      
+      setUsers(usersResponse.data);
+      setRoles(rolesResponse.data);
+      setStations(stationsResponse.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Ошибка при загрузке данных');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // В реальном приложении здесь были бы запросы к API
-        // const usersResponse = await api.get('/user');
-        // const rolesResponse = await api.get('/role');
-        // const stationsResponse = await api.get('/fire-station');
-        
-        // Демонстрационные данные
-        const mockUsers: User[] = [
-          { 
-            id: 1, 
-            username: 'admin', 
-            roleId: 1, 
-            role: { id: 1, name: 'admin' },
-            fireStationId: undefined,
-            fireStation: undefined
-          },
-          { 
-            id: 2, 
-            username: 'central', 
-            roleId: 2, 
-            role: { id: 2, name: 'central_dispatcher' },
-            fireStationId: undefined,
-            fireStation: undefined
-          },
-          { 
-            id: 3, 
-            username: 'station1', 
-            roleId: 3, 
-            role: { id: 3, name: 'station_dispatcher' },
-            fireStationId: 1,
-            fireStation: { id: 1, name: 'Пожарная часть №1' }
-          },
-          { 
-            id: 4, 
-            username: 'station2', 
-            roleId: 3, 
-            role: { id: 3, name: 'station_dispatcher' },
-            fireStationId: 2,
-            fireStation: { id: 2, name: 'Пожарная часть №2' }
-          }
-        ];
-        
-        const mockRoles: Role[] = [
-          { id: 1, name: 'admin' },
-          { id: 2, name: 'central_dispatcher' },
-          { id: 3, name: 'station_dispatcher' }
-        ];
-        
-        const mockStations: FireStation[] = [
-          { id: 1, name: 'Пожарная часть №1' },
-          { id: 2, name: 'Пожарная часть №2' },
-          { id: 3, name: 'Пожарная часть №3' }
-        ];
-        
-        setUsers(mockUsers);
-        setRoles(mockRoles);
-        setStations(mockStations);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Ошибка при загрузке данных');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchData();
   }, []);
   
@@ -138,25 +98,14 @@ export default function UsersAdminPage() {
     try {
       setIsSubmitting(true);
       
-      // В реальном приложении здесь был бы запрос к API
-      // const response = await api.post('/user', {
-      //   username: newUsername,
-      //   password: newPassword,
-      //   roleId: newRoleId,
-      //   fireStationId: newFireStationId
-      // });
-      
-      // Имитация успешного создания
-      const newUser: User = {
-        id: users.length + 1,
+      const response = await api.post('/api/user', {
         username: newUsername,
+        password: newPassword,
         roleId: newRoleId,
-        role: roles.find(role => role.id === newRoleId)!,
-        fireStationId: newFireStationId,
-        fireStation: newFireStationId ? stations.find(station => station.id === newFireStationId) : undefined
-      };
+        fireStationId: newFireStationId
+      });
       
-      setUsers([...users, newUser]);
+      setUsers([...users, response.data]);
       toast.success('Пользователь успешно создан');
       
       // Сброс формы
@@ -170,6 +119,94 @@ export default function UsersAdminPage() {
       toast.error('Ошибка при создании пользователя');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Начало редактирования пользователя
+  const startEditing = (user: User) => {
+    setEditUserId(user.id);
+    setEditUsername(user.username);
+    setEditPassword(''); // Пароль не заполняем, меняется только если введен новый
+    setEditRoleId(user.roleId);
+    setEditFireStationId(user.fireStationId);
+    setIsEditingUser(true);
+  };
+  
+  // Отмена редактирования
+  const cancelEditing = () => {
+    setEditUserId(null);
+    setEditUsername('');
+    setEditPassword('');
+    setEditRoleId(0);
+    setEditFireStationId(undefined);
+    setIsEditingUser(false);
+  };
+  
+  // Обработка редактирования пользователя
+  const handleEdit = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    if (!editUsername || !editRoleId || !editUserId) {
+      toast.error('Заполните все обязательные поля');
+      return;
+    }
+    
+    // Проверка на обязательное указание пожарной части для диспетчера части
+    const selectedRole = roles.find(role => role.id === editRoleId);
+    if (selectedRole?.name === 'station_dispatcher' && !editFireStationId) {
+      toast.error('Для диспетчера части необходимо указать пожарную часть');
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      
+      // Формируем данные для отправки, включая пароль только если он был введен
+      const userData: any = {
+        username: editUsername,
+        roleId: editRoleId,
+        fireStationId: editFireStationId
+      };
+      
+      // Добавляем пароль только если он был введен
+      if (editPassword) {
+        userData.password = editPassword;
+      }
+      
+      const response = await api.put(`/api/user/${editUserId}`, userData);
+      
+      // Обновляем список пользователей
+      setUsers(users.map(user => user.id === editUserId ? response.data : user));
+      
+      toast.success('Пользователь успешно обновлен');
+      
+      // Сброс формы
+      cancelEditing();
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast.error('Ошибка при обновлении пользователя');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  // Удаление пользователя
+  const handleDelete = async (userId: number) => {
+    // Подтверждение удаления
+    if (!window.confirm('Вы уверены, что хотите удалить этого пользователя?')) {
+      return;
+    }
+    
+    try {
+      await api.delete(`/api/user/${userId}`);
+      
+      // Удаляем пользователя из списка
+      setUsers(users.filter(user => user.id !== userId));
+      
+      toast.success('Пользователь успешно удален');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Ошибка при удалении пользователя');
     }
   };
   
@@ -203,7 +240,7 @@ export default function UsersAdminPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-800">Управление пользователями</h1>
-          {!isAddingUser && (
+          {!isAddingUser && !isEditingUser && (
             <button 
               onClick={() => setIsAddingUser(true)}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm"
@@ -309,6 +346,101 @@ export default function UsersAdminPage() {
           </div>
         )}
         
+        {/* Форма редактирования пользователя */}
+        {isEditingUser && (
+          <div className="bg-white p-6 shadow-md rounded-lg mb-6">
+            <h2 className="text-lg font-semibold mb-4">Редактирование пользователя</h2>
+            <form onSubmit={handleEdit} className="space-y-4">
+              <div>
+                <label htmlFor="edit-username" className="block text-sm font-medium text-gray-700 mb-1">
+                  Имя пользователя*
+                </label>
+                <input
+                  id="edit-username"
+                  type="text"
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="edit-password" className="block text-sm font-medium text-gray-700 mb-1">
+                  Новый пароль (оставьте пустым, чтобы не менять)
+                </label>
+                <input
+                  id="edit-password"
+                  type="password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="edit-role" className="block text-sm font-medium text-gray-700 mb-1">
+                  Роль*
+                </label>
+                <select
+                  id="edit-role"
+                  value={editRoleId}
+                  onChange={(e) => setEditRoleId(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                  required
+                >
+                  <option value={0}>Выберите роль</option>
+                  {roles.map(role => (
+                    <option key={role.id} value={role.id}>
+                      {formatRoleName(role.name)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Показываем выбор пожарной части только для диспетчеров части */}
+              {editRoleId === 3 && (
+                <div>
+                  <label htmlFor="edit-station" className="block text-sm font-medium text-gray-700 mb-1">
+                    Пожарная часть*
+                  </label>
+                  <select
+                    id="edit-station"
+                    value={editFireStationId || 0}
+                    onChange={(e) => setEditFireStationId(Number(e.target.value) || undefined)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                    required
+                  >
+                    <option value={0}>Выберите пожарную часть</option>
+                    {stations.map(station => (
+                      <option key={station.id} value={station.id}>
+                        {station.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Сохранение...' : 'Сохранить изменения'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+        
         {/* Список пользователей */}
         {loading ? (
           <div className="flex justify-center py-8">
@@ -355,13 +487,13 @@ export default function UsersAdminPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button 
                           className="text-indigo-600 hover:text-indigo-900 mr-3"
-                          onClick={() => toast.info('Функция редактирования пользователя в разработке')}
+                          onClick={() => startEditing(user)}
                         >
                           Редактировать
                         </button>
                         <button 
                           className="text-red-600 hover:text-red-900"
-                          onClick={() => toast.info('Функция удаления пользователя в разработке')}
+                          onClick={() => handleDelete(user.id)}
                         >
                           Удалить
                         </button>

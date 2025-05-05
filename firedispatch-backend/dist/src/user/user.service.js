@@ -52,6 +52,47 @@ let UserService = class UserService {
     async countUsers() {
         return this.prisma.user.count();
     }
+    async getAllUsers() {
+        return this.prisma.user.findMany({
+            include: {
+                fireStation: true,
+            },
+            orderBy: {
+                id: 'asc',
+            }
+        });
+    }
+    async updateUser(id, dto) {
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) {
+            throw new common_1.NotFoundException(`Пользователь с ID ${id} не найден`);
+        }
+        const data = {
+            username: dto.username,
+            role: dto.roleId ? dto.roleId : undefined,
+            fireStationId: dto.fireStationId,
+            name: dto.name,
+        };
+        if (dto.password) {
+            data.password = await bcrypt.hash(dto.password, 10);
+        }
+        return this.prisma.user.update({
+            where: { id },
+            data,
+            include: {
+                fireStation: true,
+            }
+        });
+    }
+    async deleteUser(id) {
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) {
+            throw new common_1.NotFoundException(`Пользователь с ID ${id} не найден`);
+        }
+        return this.prisma.user.delete({
+            where: { id }
+        });
+    }
 };
 exports.UserService = UserService;
 exports.UserService = UserService = __decorate([

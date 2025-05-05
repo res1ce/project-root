@@ -32,51 +32,21 @@ export default function FireStationsAdminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Получение данных
+  const fetchStations = async () => {
+    try {
+      setLoading(true);
+      
+      const response = await api.get('/api/fire-station');
+      setStations(response.data);
+    } catch (error) {
+      console.error('Error fetching fire stations:', error);
+      toast.error('Ошибка при загрузке данных о пожарных частях');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchStations = async () => {
-      try {
-        setLoading(true);
-        
-        // В реальном приложении здесь был бы запрос к API
-        // const response = await api.get('/fire-station');
-        
-        // Демонстрационные данные
-        const mockStations: FireStation[] = [
-          { 
-            id: 1, 
-            name: 'Пожарная часть №1', 
-            address: 'ул. Ленина, 10', 
-            latitude: 55.751244, 
-            longitude: 37.618423,
-            phoneNumber: '+7 (495) 123-45-67',
-          },
-          { 
-            id: 2, 
-            name: 'Пожарная часть №2', 
-            address: 'ул. Гагарина, 25', 
-            latitude: 55.761244, 
-            longitude: 37.628423,
-            phoneNumber: '+7 (495) 765-43-21',
-          },
-          { 
-            id: 3, 
-            name: 'Пожарная часть №3', 
-            address: 'ул. Пушкина, 15', 
-            latitude: 55.741244, 
-            longitude: 37.608423,
-            phoneNumber: '+7 (495) 987-65-43',
-          }
-        ];
-        
-        setStations(mockStations);
-      } catch (error) {
-        console.error('Error fetching fire stations:', error);
-        toast.error('Ошибка при загрузке данных о пожарных частях');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchStations();
   }, []);
   
@@ -121,58 +91,24 @@ export default function FireStationsAdminPage() {
     try {
       setIsSubmitting(true);
       
+      const stationData = {
+        name: stationName,
+        address: stationAddress,
+        latitude,
+        longitude,
+        phoneNumber: stationPhoneNumber
+      };
+      
       if (isEditingStation && selectedStationId) {
-        // В реальном приложении здесь был бы запрос на обновление
-        // const response = await api.put(`/fire-station/${selectedStationId}`, {
-        //   name: stationName,
-        //   address: stationAddress,
-        //   latitude,
-        //   longitude,
-        //   phoneNumber: stationPhoneNumber,
-        //   engineCount
-        // });
-        
-        // Имитация обновления
-        const updatedStations = stations.map(station => 
-          station.id === selectedStationId 
-            ? { 
-                ...station, 
-                name: stationName, 
-                address: stationAddress, 
-                latitude,
-                longitude, 
-                phoneNumber: stationPhoneNumber
-              } 
-            : station
-        );
-        
-        setStations(updatedStations);
+        await api.put(`/api/fire-station/${selectedStationId}`, stationData);
         toast.success('Пожарная часть успешно обновлена');
       } else {
-        // В реальном приложении здесь был бы запрос на создание
-        // const response = await api.post('/fire-station', {
-        //   name: stationName,
-        //   address: stationAddress,
-        //   latitude,
-        //   longitude,
-        //   phoneNumber: stationPhoneNumber,
-        //   engineCount
-        // });
-        
-        // Имитация создания
-        const newStation: FireStation = {
-          id: Math.max(...stations.map(s => s.id), 0) + 1,
-          name: stationName,
-          address: stationAddress,
-          latitude,
-          longitude,
-          phoneNumber: stationPhoneNumber
-        };
-        
-        setStations([...stations, newStation]);
+        await api.post('/api/fire-station', stationData);
         toast.success('Пожарная часть успешно создана');
       }
       
+      // Обновляем список станций
+      await fetchStations();
       resetForm();
     } catch (error) {
       console.error('Error saving fire station:', error);
@@ -188,11 +124,8 @@ export default function FireStationsAdminPage() {
     }
     
     try {
-      // В реальном приложении здесь был бы запрос на удаление
-      // await api.delete(`/fire-station/${stationId}`);
-      
-      // Имитация удаления
-      setStations(stations.filter(station => station.id !== stationId));
+      await api.delete(`/api/fire-station/${stationId}`);
+      await fetchStations(); // Обновляем список после удаления
       toast.success('Пожарная часть успешно удалена');
     } catch (error) {
       console.error('Error deleting fire station:', error);

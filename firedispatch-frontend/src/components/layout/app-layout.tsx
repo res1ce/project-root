@@ -4,7 +4,6 @@ import { ReactNode, useEffect } from 'react';
 import { useAuthStore } from '@/store/auth-store';
 import { useRouter } from 'next/navigation';
 import AppHeader from './app-header';
-import { Toaster } from '@/components/ui/toast';
 import { useEnhancedFireEvents } from '@/hooks/use-enhanced-fire-events';
 import { FireAlertsContainer } from '@/components/ui/fire-alert';
 
@@ -47,7 +46,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <main className="flex-1 p-4 sm:p-6 mx-auto max-w-7xl w-full">
         {children}
       </main>
-      <Toaster position="top-right" />
       
       {/* Fire alerts container for real-time notifications */}
       {alerts.length > 0 && (

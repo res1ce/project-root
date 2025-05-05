@@ -49,8 +49,8 @@ let FireController = class FireController {
             throw new common_1.BadRequestException(e.message);
         }
     }
-    getAll() {
-        return this.fireService.getAll();
+    getAll(req) {
+        return this.fireService.getAll(req.user.userId, req.user.role);
     }
     async getById(id) {
         const numId = Number(id);
@@ -163,6 +163,14 @@ let FireController = class FireController {
     deleteAddressLevel(id) {
         return this.fireService.deleteAddressLevel(Number(id));
     }
+    async resolveFire(id, req) {
+        const numId = Number(id);
+        if (!numId || isNaN(numId))
+            throw new common_1.BadRequestException('Некорректный id');
+        const result = await this.fireService.setFireStatus(numId, 'RESOLVED');
+        await this.userActivityService.logActivity(req.user.userId, 'resolve_fire', { fireId: numId }, req);
+        return result;
+    }
 };
 exports.FireController = FireController;
 __decorate([
@@ -178,8 +186,9 @@ __decorate([
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(),
+    __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], FireController.prototype, "getAll", null);
 __decorate([
@@ -372,6 +381,16 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], FireController.prototype, "deleteAddressLevel", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('central_dispatcher', 'station_dispatcher'),
+    (0, common_1.Patch)(':id/resolve'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], FireController.prototype, "resolveFire", null);
 exports.FireController = FireController = __decorate([
     (0, common_1.Controller)('fire'),
     __metadata("design:paramtypes", [fire_service_1.FireService,

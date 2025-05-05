@@ -1,7 +1,7 @@
 'use client';
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from '@/components/ui/toast';
 
 interface Props {
   children: ReactNode;
@@ -36,10 +36,16 @@ class ErrorBoundary extends Component<Props, State> {
     // Отображаем сообщение об ошибке с помощью toast
     if (error.message.includes('AxiosError') || error.message.includes('401')) {
       // Обрабатываем ошибки Axios отдельно
-      toast.error('Ошибка авторизации. Пожалуйста, проверьте введенные данные.');
+      toast({ 
+        title: 'Ошибка авторизации. Пожалуйста, проверьте введенные данные.',
+        variant: 'destructive'
+      });
     } else {
       // Общее сообщение об ошибке для остальных случаев
-      toast.error('Произошла ошибка. Пожалуйста, попробуйте еще раз.');
+      toast({ 
+        title: 'Произошла ошибка. Пожалуйста, попробуйте еще раз.',
+        variant: 'destructive'
+      });
     }
   }
 

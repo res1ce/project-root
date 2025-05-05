@@ -5,11 +5,11 @@ export declare class SystemSettingsService {
     constructor(prisma: PrismaService);
     getSettings(): Promise<{
         id: number;
-        updatedAt: Date;
         defaultCityName: string;
         defaultLatitude: number;
         defaultLongitude: number;
         defaultZoom: number;
+        updatedAt: Date;
         updatedById: number | null;
     }>;
     updateSettings(dto: UpdateSystemSettingsDto, userId: number): Promise<{
@@ -20,11 +20,11 @@ export declare class SystemSettingsService {
         } | null;
     } & {
         id: number;
-        updatedAt: Date;
         defaultCityName: string;
         defaultLatitude: number;
         defaultLongitude: number;
         defaultZoom: number;
+        updatedAt: Date;
         updatedById: number | null;
     }>;
 }

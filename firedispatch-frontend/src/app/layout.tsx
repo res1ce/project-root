@@ -4,13 +4,12 @@ import './globals.css';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth-store';
 import { Inter } from 'next/font/google';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import { MantineProvider } from '@mantine/core';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
+import { Providers } from '@/providers'
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin', 'cyrillic'] });
 
 export default function RootLayout({
   children,
@@ -34,20 +33,11 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <MantineProvider>
-          <ToastContainer
-            position="top-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-          />
-          {children}
-        </MantineProvider>
+        <Providers>
+          <MantineProvider>
+            {children}
+          </MantineProvider>
+        </Providers>
       </body>
     </html>
   );

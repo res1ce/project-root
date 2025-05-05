@@ -43,7 +43,7 @@ export default function FireAddressLevels() {
   const fetchAddresses = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get<FireAddressLevel[]>('/fire/address-level');
+      const response = await api.get<FireAddressLevel[]>('/api/fire-address-level');
       setAddresses(response.data);
     } catch (error: any) {
       console.error('Ошибка при загрузке адресов:', error);
@@ -70,7 +70,7 @@ export default function FireAddressLevels() {
     setIsLoading(true);
     try {
       if (isEditMode && currentAddress.id) {
-        await api.put(`/fire/address-level/${currentAddress.id}`, {
+        await api.put(`/api/fire-address-level/${currentAddress.id}`, {
           address: currentAddress.address,
           fireLevelId: currentAddress.fireLevelId,
           description: currentAddress.description || ''
@@ -80,7 +80,7 @@ export default function FireAddressLevels() {
           description: 'Адрес успешно обновлен',
         });
       } else {
-        await api.post('/fire/address-level', {
+        await api.post('/api/fire-address-level', {
           address: currentAddress.address,
           fireLevelId: currentAddress.fireLevelId,
           description: currentAddress.description || ''
@@ -111,7 +111,7 @@ export default function FireAddressLevels() {
     
     setIsLoading(true);
     try {
-      await api.delete(`/fire/address-level/${id}`);
+      await api.delete(`/api/fire-address-level/${id}`);
       toast({
         title: 'Успех',
         description: 'Адрес успешно удален',

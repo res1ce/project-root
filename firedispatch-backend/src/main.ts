@@ -7,6 +7,9 @@ import { PrismaClientExceptionFilter } from './prisma-client-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
+  // Устанавливаем глобальный префикс для всех маршрутов
+  app.setGlobalPrefix('api');
+  
   // Включаем CORS для фронтенда
   app.enableCors({
     origin: ['http://localhost:3001', 'http://localhost:3000'],

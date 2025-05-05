@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import FireMap from '@/components/fire-map/DynamicMap';
+import { useState, useCallback, useMemo } from 'react';
+import DynamicMap from '@/components/fire-map/DynamicMap';
 import { FireCreationModal } from './fire-creation-modal';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth-store';
@@ -45,14 +45,17 @@ export function FireLocationSelector({ onFireCreated }: FireLocationSelectorProp
     onFireCreated?.();
   }, [onFireCreated]);
   
+  // Мемоизируем пропсы для карты, чтобы предотвратить ненужные перерисовки
+  const mapProps = useMemo(() => ({
+    allowCreation: canCreateFire,
+    onLocationSelect: handleLocationSelect,
+    showStations: true
+  }), [canCreateFire, handleLocationSelect]);
+  
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 relative">
-        <FireMap 
-          allowCreation={canCreateFire}
-          onLocationSelect={handleLocationSelect}
-          showStations
-        />
+        <DynamicMap {...mapProps} />
       </div>
       
       {canCreateFire && selectedLocation && (
@@ -82,6 +85,7 @@ export function FireLocationSelector({ onFireCreated }: FireLocationSelectorProp
           isOpen={isCreatingFire}
           onClose={handleModalClose}
           location={selectedLocation}
+          onCreated={handleFireCreated}
         />
       )}
     </div>

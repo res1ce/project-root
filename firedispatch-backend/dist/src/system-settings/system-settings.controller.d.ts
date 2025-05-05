@@ -9,11 +9,11 @@ export declare class SystemSettingsController {
     constructor(systemSettingsService: SystemSettingsService);
     getSettings(): Promise<{
         id: number;
-        updatedAt: Date;
         defaultCityName: string;
         defaultLatitude: number;
         defaultLongitude: number;
         defaultZoom: number;
+        updatedAt: Date;
         updatedById: number | null;
     }>;
     updateSettings(dto: UpdateSystemSettingsDto, req: RequestWithUser): Promise<{
@@ -24,11 +24,11 @@ export declare class SystemSettingsController {
         } | null;
     } & {
         id: number;
-        updatedAt: Date;
         defaultCityName: string;
         defaultLatitude: number;
         defaultLongitude: number;
         defaultZoom: number;
+        updatedAt: Date;
         updatedById: number | null;
     }>;
 }

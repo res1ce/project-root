@@ -10,74 +10,74 @@ export declare class ReportService {
     create(userId: number, dto: CreateReportDto): Promise<{
         user: {
             id: number;
+            updatedAt: Date;
             name: string;
             createdAt: Date;
-            updatedAt: Date;
+            fireStationId: number | null;
             username: string;
             password: string;
             role: import(".prisma/client").$Enums.UserRole;
-            fireStationId: number | null;
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        userId: number;
+        createdAt: Date;
         fireIncidentId: number;
+        userId: number;
         content: string;
     }>;
     getAll(): Promise<({
         user: {
             id: number;
+            updatedAt: Date;
             name: string;
             createdAt: Date;
-            updatedAt: Date;
+            fireStationId: number | null;
             username: string;
             password: string;
             role: import(".prisma/client").$Enums.UserRole;
-            fireStationId: number | null;
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        userId: number;
+        createdAt: Date;
         fireIncidentId: number;
+        userId: number;
         content: string;
     })[]>;
     getById(id: number): Promise<({
         user: {
             id: number;
+            updatedAt: Date;
             name: string;
             createdAt: Date;
-            updatedAt: Date;
+            fireStationId: number | null;
             username: string;
             password: string;
             role: import(".prisma/client").$Enums.UserRole;
-            fireStationId: number | null;
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        userId: number;
+        createdAt: Date;
         fireIncidentId: number;
+        userId: number;
         content: string;
     }) | null>;
     delete(id: number): Promise<{
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        userId: number;
+        createdAt: Date;
         fireIncidentId: number;
+        userId: number;
         content: string;
     }>;
     createFireReport(userId: number, fireIncidentId: number, content: string): Promise<{
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        userId: number;
+        createdAt: Date;
         fireIncidentId: number;
+        userId: number;
         content: string;
     }>;
     getFireReports(fireIncidentId: number): Promise<({
@@ -87,10 +87,10 @@ export declare class ReportService {
         };
     } & {
         id: number;
-        createdAt: Date;
         updatedAt: Date;
-        userId: number;
+        createdAt: Date;
         fireIncidentId: number;
+        userId: number;
         content: string;
     })[]>;
     generateFireIncidentPDF(fireIncidentId: number): Promise<string>;
