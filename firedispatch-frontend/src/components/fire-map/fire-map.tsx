@@ -515,17 +515,17 @@ export default function FireMap({
 
   // Функция для получения названия уровня пожара
   const getFireLevelInfo = (fire: any): { level: string, name: string, description: string } => {
-    if (fire.level?.name) {
-      return {
-        level: fire.level.name,
-        name: fire.level.name,
-        description: fire.level.description || ''
-      };
-    } else if (fire.fireLevel?.name) {
+    if (fire.fireLevel?.name) {
       return {
         level: fire.fireLevel.level.toString(),
         name: fire.fireLevel.name,
         description: fire.fireLevel.description || ''
+      };
+    } else if (fire.level?.name) {
+      return {
+        level: (fire.level.level !== undefined ? fire.level.level : fire.level.id).toString(),
+        name: fire.level.name,
+        description: fire.level.description || ''
       };
     }
     return { level: fire.levelId?.toString() || '?', name: 'Уровень ' + (fire.levelId || '?'), description: '' };

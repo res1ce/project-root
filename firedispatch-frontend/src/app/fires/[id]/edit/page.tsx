@@ -55,6 +55,7 @@ interface Fire {
 
 interface FireLevel {
   id: number;
+  level?: number;
   name: string;
   description: string;
 }
@@ -382,7 +383,7 @@ export default function EditFirePage() {
                     <option value="">Выберите уровень</option>
                     {fireLevels.map(level => (
                       <option key={level.id} value={level.id}>
-                        {level.name} - {level.description}
+                        {level.level || level.id} - {level.name}
                       </option>
                     ))}
                   </select>

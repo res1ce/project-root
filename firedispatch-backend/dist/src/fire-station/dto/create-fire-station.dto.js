@@ -16,6 +16,7 @@ class CreateFireStationDto {
     address;
     latitude;
     longitude;
+    phoneNumber;
 }
 exports.CreateFireStationDto = CreateFireStationDto;
 __decorate([
@@ -34,4 +35,9 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     __metadata("design:type", Number)
 ], CreateFireStationDto.prototype, "longitude", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFireStationDto.prototype, "phoneNumber", void 0);
 //# sourceMappingURL=create-fire-station.dto.js.map

@@ -419,13 +419,7 @@ export class FireService {
   async getAllLevels() {
     return this.prisma.fireLevel.findMany({
       include: {
-        requirements: {
-          select: {
-            id: true,
-            count: true,
-            vehicleType: true
-          }
-        }
+        requirements: true
       },
       orderBy: {
         level: 'asc'
@@ -434,23 +428,26 @@ export class FireService {
   }
 
   async getLevelById(id: number) {
-    const levelId = Number(id);
-    if (isNaN(levelId)) {
-      throw new BadRequestException('Некорректный ID уровня пожара');
-    }
-    
-    const level = await this.prisma.fireLevel.findUnique({
-      where: { id: levelId },
+    return this.prisma.fireLevel.findUnique({
+      where: { id },
       include: {
         requirements: true
       }
     });
-    
-    if (!level) {
-      throw new NotFoundException(`Уровень пожара с ID ${id} не найден`);
-    }
-    
-    return level;
+  }
+  
+  async getLevelByNumber(level: number) {
+    return this.prisma.fireLevel.findUnique({
+      where: { level }
+    });
+  }
+  
+  async getFirstLevel() {
+    return this.prisma.fireLevel.findFirst({
+      orderBy: {
+        level: 'asc'
+      }
+    });
   }
 
   async createLevel(dto: CreateFireLevelDto) {
@@ -643,9 +640,30 @@ export class FireService {
 
   // Метод для автоматического определения уровня пожара
   async determineFireLevel(location: [number, number], address?: string): Promise<number> {
-    // Если указан адрес, проверяем его на соответствие в таблице предопределенных уровней
+    // Извлекаем координаты пожара
+    const [longitude, latitude] = location;
+    
+    // 1. Если указан адрес, проверяем его на точное соответствие в таблице предопределенных уровней
     if (address) {
-      const addressLevel = await this.prisma.fireAddressLevel.findFirst({
+      const exactAddressMatch = await this.prisma.fireAddressLevel.findFirst({
+        where: {
+          address: {
+            equals: address,
+            mode: 'insensitive'
+          }
+        },
+        include: {
+          fireLevel: true
+        }
+      });
+      
+      if (exactAddressMatch) {
+        console.log(`[DEBUG] Найдено точное соответствие адреса "${address}" в базе данных с уровнем ${exactAddressMatch.fireLevel.level}`);
+        return exactAddressMatch.fireLevel.level;
+      }
+      
+      // 2. Если точного соответствия нет, ищем по частичному соответствию адреса
+      const partialAddressMatch = await this.prisma.fireAddressLevel.findFirst({
         where: {
           address: {
             contains: address,
@@ -657,20 +675,68 @@ export class FireService {
         }
       });
       
-      if (addressLevel) {
-        return addressLevel.fireLevel.level;
+      if (partialAddressMatch) {
+        console.log(`[DEBUG] Найдено частичное соответствие адреса "${address}" в базе данных с уровнем ${partialAddressMatch.fireLevel.level}`);
+        return partialAddressMatch.fireLevel.level;
       }
     }
     
-    // Если адрес не указан или для него не задан уровень пожара,
-    // возвращаем самый низкий уровень
+    // 3. Если адрес не найден, ищем по координатам с учетом расстояния
+    const addressesWithCoordinates = await this.prisma.fireAddressLevel.findMany({
+      where: {
+        latitude: { not: null },
+        longitude: { not: null }
+      },
+      include: {
+        fireLevel: true
+      }
+    });
+    
+    if (addressesWithCoordinates.length > 0) {
+      // Вычисляем расстояние до каждого адреса и находим ближайший
+      const addressesWithDistance = addressesWithCoordinates
+        .filter(addr => addr.latitude && addr.longitude) // Дополнительная проверка для TypeScript
+        .map(addr => ({
+          ...addr,
+          distance: this.calculateDistance(
+            latitude, 
+            longitude, 
+            addr.latitude!, 
+            addr.longitude!
+          )
+        }))
+        .sort((a, b) => a.distance - b.distance);
+      
+      // Если есть адрес в радиусе 500 метров, используем его уровень
+      const nearbyAddress = addressesWithDistance[0];
+      if (nearbyAddress && nearbyAddress.distance < 0.5) { // 0.5 км = 500 метров
+        console.log(`[DEBUG] Найден ближайший адрес с координатами на расстоянии ${nearbyAddress.distance.toFixed(3)} км с уровнем ${nearbyAddress.fireLevel.level}`);
+        return nearbyAddress.fireLevel.level;
+      }
+    }
+    
+    // 4. Если ничего не найдено, возвращаем самый низкий уровень
     const lowestLevel = await this.prisma.fireLevel.findFirst({
       orderBy: {
         level: 'asc'
       }
     });
     
+    console.log(`[DEBUG] Не найдено совпадений по адресу или координатам, используется минимальный уровень ${lowestLevel?.level || 1}`);
     return lowestLevel ? lowestLevel.level : 1;
+  }
+  
+  // Вспомогательная функция для расчета расстояния между точками в км (по формуле Хаверсина)
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Радиус Земли в км
+    const dLat = this.deg2rad(lat2 - lat1);
+    const dLon = this.deg2rad(lon2 - lon1);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return R * c; // Расстояние в км
   }
 
   // --- Методы для истории пожаров ---
@@ -857,7 +923,13 @@ export class FireService {
     return addressLevel;
   }
 
-  async createAddressLevel(data: { address: string; fireLevelId: number; description?: string }) {
+  async createAddressLevel(data: { 
+    address: string; 
+    fireLevelId: number; 
+    description?: string;
+    latitude?: number;
+    longitude?: number;
+  }) {
     // Проверяем, существует ли уровень пожара
     const fireLevel = await this.prisma.fireLevel.findUnique({
       where: { id: data.fireLevelId }
@@ -881,10 +953,13 @@ export class FireService {
       throw new BadRequestException(`Адрес ${data.address} уже существует в базе данных`);
     }
     
+    // Создаем новую запись с координатами, если они указаны
     return this.prisma.fireAddressLevel.create({
       data: {
         address: data.address,
         description: data.description,
+        latitude: data.latitude,
+        longitude: data.longitude,
         fireLevel: {
           connect: { id: data.fireLevelId }
         }

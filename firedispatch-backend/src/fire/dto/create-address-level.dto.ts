@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsNumber } from 'class-validator';
 
 export class CreateAddressLevelDto {
   @IsString()
@@ -10,4 +10,12 @@ export class CreateAddressLevelDto {
   @IsOptional()
   @IsString()
   description?: string;
+  
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+  
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
 } 

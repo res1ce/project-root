@@ -15,6 +15,8 @@ class CreateAddressLevelDto {
     address;
     fireLevelId;
     description;
+    latitude;
+    longitude;
 }
 exports.CreateAddressLevelDto = CreateAddressLevelDto;
 __decorate([
@@ -30,4 +32,14 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateAddressLevelDto.prototype, "description", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], CreateAddressLevelDto.prototype, "latitude", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], CreateAddressLevelDto.prototype, "longitude", void 0);
 //# sourceMappingURL=create-address-level.dto.js.map

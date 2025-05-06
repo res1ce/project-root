@@ -10,6 +10,7 @@ import { WebsocketModule } from './websocket/websocket.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { EngineTypeModule } from './engine-type/engine-type.module';
+import { FireEngineModule } from './fire-engine/fire-engine.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -28,6 +29,7 @@ import configuration from './config/configuration';
     SystemSettingsModule,
     DashboardModule,
     EngineTypeModule,
+    FireEngineModule,
   ],
 })
 export class AppModule {}

@@ -11,6 +11,7 @@ export declare class UserService {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         } | null;
         reports: {
@@ -39,6 +40,7 @@ export declare class UserService {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         } | null;
     } & {
@@ -70,6 +72,7 @@ export declare class UserService {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         } | null;
     } & {
@@ -90,6 +93,7 @@ export declare class UserService {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         } | null;
     } & {

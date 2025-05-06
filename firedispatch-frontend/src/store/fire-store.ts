@@ -17,10 +17,11 @@ interface FireState {
   setSelectedFire: (fire: Fire | null) => void;
   createFire: (data: { 
     location: [number, number]; 
-    levelId: number; 
+    levelId?: number; 
     status: string;
     address: string;
     description?: string;
+    autoLevel?: boolean;
   }) => Promise<void>;
   updateFire: (id: number, data: Partial<Fire>) => Promise<void>;
   changeFireLevel: (id: number, levelId: number, reason?: string) => Promise<void>;

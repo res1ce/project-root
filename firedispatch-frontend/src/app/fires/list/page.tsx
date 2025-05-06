@@ -17,6 +17,12 @@ interface ExtendedFire extends Fire {
     name: string;
     description: string;
   };
+  level?: {
+    id: number;
+    level?: number;
+    name: string;
+    description: string;
+  };
   fireStation?: {
     id: number;
     name: string;
@@ -136,7 +142,7 @@ export default function FiresListPage() {
                           {extendedFire.fireLevel ? 
                             `${extendedFire.fireLevel.level} - ${extendedFire.fireLevel.name}` :
                             extendedFire.level ? 
-                              `${extendedFire.level.name} - ${extendedFire.level.description}` : 
+                              `${extendedFire.level.level || extendedFire.level.id} - ${extendedFire.level.name}` : 
                               extendedFire.levelId ? `Уровень ${extendedFire.levelId}` : 'Не указан'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

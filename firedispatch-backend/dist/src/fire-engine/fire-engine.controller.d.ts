@@ -24,6 +24,7 @@ export declare class FireEngineController {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         };
     } & {
@@ -43,6 +44,7 @@ export declare class FireEngineController {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         };
     } & {

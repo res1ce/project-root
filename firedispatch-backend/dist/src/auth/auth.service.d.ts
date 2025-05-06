@@ -12,6 +12,7 @@ export declare class AuthService {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         } | null;
         reports: {

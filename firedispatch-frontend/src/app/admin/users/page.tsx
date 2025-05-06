@@ -4,16 +4,19 @@ import { useState, useEffect, FormEvent } from 'react';
 import AppLayout from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import api from '@/lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '@/components/ui/toast';
 
 interface User {
   id: number;
   username: string;
-  roleId: number;
-  role: {
-    id: number;
-    name: string;
-  };
+  roleId?: number;
+  roleName?: string;
+  role?: {
+    id?: number;
+    name?: string;
+    value?: string;
+    displayName?: string;
+  } | string; // Роль может приходить как строка
   fireStationId?: number;
   fireStation?: {
     id: number;
@@ -30,6 +33,22 @@ interface FireStation {
   id: number;
   name: string;
 }
+
+// Словарь для преобразования ID ролей в формат, который ожидает бэкенд
+const ROLE_MAPPING: Record<string, string> = {
+  '1': 'ADMIN',
+  '2': 'CENTRAL_DISPATCHER',
+  '3': 'STATION_DISPATCHER'
+};
+
+// Функция для безопасного получения значения из ROLE_MAPPING
+const getRoleMappingValue = (roleId: number | undefined): string | undefined => {
+  if (roleId === undefined) return undefined;
+  return ROLE_MAPPING[roleId.toString()];
+};
+
+// Константы для идентификации ролей
+const STATION_DISPATCHER_ROLE_ID = 3;
 
 export default function UsersAdminPage() {
   const { user: currentUser } = useAuthStore();
@@ -67,9 +86,13 @@ export default function UsersAdminPage() {
       setUsers(usersResponse.data);
       setRoles(rolesResponse.data);
       setStations(stationsResponse.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching data:', error);
-      toast.error('Ошибка при загрузке данных');
+      toast({
+        title: 'Ошибка',
+        description: 'Ошибка при загрузке данных',
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
     }
@@ -84,29 +107,57 @@ export default function UsersAdminPage() {
     e.preventDefault();
     
     if (!newUsername || !newPassword || !newRoleId) {
-      toast.error('Заполните все обязательные поля');
+      toast({
+        title: 'Ошибка',
+        description: 'Заполните все обязательные поля',
+        variant: 'destructive'
+      });
       return;
     }
     
     // Проверка на обязательное указание пожарной части для диспетчера части
     const selectedRole = roles.find(role => role.id === newRoleId);
     if (selectedRole?.name === 'station_dispatcher' && !newFireStationId) {
-      toast.error('Для диспетчера части необходимо указать пожарную часть');
+      toast({
+        title: 'Ошибка',
+        description: 'Для диспетчера части необходимо указать пожарную часть',
+        variant: 'destructive'
+      });
       return;
     }
     
     try {
       setIsSubmitting(true);
       
-      const response = await api.post('/api/user', {
+      // Конвертируем ID роли в формат, ожидаемый бэкендом
+      const roleValue = getRoleMappingValue(newRoleId);
+      if (!roleValue) {
+        throw new Error('Неверный ID роли');
+      }
+      
+      // Формируем данные для отправки
+      const userData: any = {
         username: newUsername,
         password: newPassword,
-        roleId: newRoleId,
-        fireStationId: newFireStationId
-      });
+        // В CreateUserDto ожидается поле role
+        role: roleValue,
+      };
+      
+      // Пожарную часть отправляем только для диспетчера станции
+      if (newRoleId === STATION_DISPATCHER_ROLE_ID) {
+        userData.fireStationId = newFireStationId;
+      }
+      
+      console.log('Создание пользователя, отправляемые данные:', userData);
+      
+      const response = await api.post('/api/user', userData);
       
       setUsers([...users, response.data]);
-      toast.success('Пользователь успешно создан');
+      toast({
+        title: 'Успешно',
+        description: 'Пользователь успешно создан',
+        variant: 'success'
+      });
       
       // Сброс формы
       setNewUsername('');
@@ -114,9 +165,23 @@ export default function UsersAdminPage() {
       setNewRoleId(0);
       setNewFireStationId(undefined);
       setIsAddingUser(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating user:', error);
-      toast.error('Ошибка при создании пользователя');
+      
+      // Улучшенная обработка ошибок
+      if (error.response?.data?.message) {
+        toast({
+          title: 'Ошибка',
+          description: error.response.data.message,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: 'Ошибка при создании пользователя',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -127,7 +192,46 @@ export default function UsersAdminPage() {
     setEditUserId(user.id);
     setEditUsername(user.username);
     setEditPassword(''); // Пароль не заполняем, меняется только если введен новый
-    setEditRoleId(user.roleId);
+    
+    // Определение ID роли на основе полученных данных
+    let roleId = 0;
+    
+    // Если роль - это строка (например, "ADMIN")
+    if (user.role && typeof user.role === 'string') {
+      // Ищем соответствующий ID в ROLE_MAPPING
+      const foundRoleId = Object.entries(ROLE_MAPPING).find(
+        ([_, value]) => value === user.role
+      )?.[0];
+      
+      if (foundRoleId) {
+        roleId = Number(foundRoleId);
+      }
+    } 
+    // Если роль - объект с полем name
+    else if (user.role && typeof user.role === 'object') {
+      const roleObj = user.role as { name?: string };
+      if (roleObj.name) {
+        // Ищем роль в списке ролей
+        const foundRole = roles.find(
+          role => role.name.toLowerCase() === roleObj.name?.toLowerCase()
+        );
+        
+        if (foundRole) {
+          roleId = foundRole.id;
+        }
+      }
+    }
+    // Если есть прямое поле roleId
+    else if (user.roleId !== undefined) {
+      roleId = user.roleId;
+    }
+    
+    console.log('Редактирование пользователя:', {
+      user,
+      determinedRoleId: roleId
+    });
+    
+    setEditRoleId(roleId || 0);
     setEditFireStationId(user.fireStationId);
     setIsEditingUser(true);
   };
@@ -147,44 +251,91 @@ export default function UsersAdminPage() {
     e.preventDefault();
     
     if (!editUsername || !editRoleId || !editUserId) {
-      toast.error('Заполните все обязательные поля');
+      toast({
+        title: 'Ошибка',
+        description: 'Заполните все обязательные поля',
+        variant: 'destructive'
+      });
       return;
     }
     
     // Проверка на обязательное указание пожарной части для диспетчера части
     const selectedRole = roles.find(role => role.id === editRoleId);
     if (selectedRole?.name === 'station_dispatcher' && !editFireStationId) {
-      toast.error('Для диспетчера части необходимо указать пожарную часть');
+      toast({
+        title: 'Ошибка',
+        description: 'Для диспетчера части необходимо указать пожарную часть',
+        variant: 'destructive'
+      });
       return;
     }
     
     try {
       setIsSubmitting(true);
       
-      // Формируем данные для отправки, включая пароль только если он был введен
+      // Конвертируем ID роли в формат, ожидаемый бэкендом
+      const roleValue = getRoleMappingValue(editRoleId);
+      if (!roleValue) {
+        throw new Error('Неверный ID роли');
+      }
+      
+      // Формируем данные для отправки с учетом бага в бэкенде
       const userData: any = {
         username: editUsername,
-        roleId: editRoleId,
-        fireStationId: editFireStationId
+        // На бэкенде используется поле roleId для обновления поля role в базе данных
+        roleId: roleValue, 
       };
+      
+      // Если роль не диспетчер станции, обнуляем привязку к пожарной части
+      if (editRoleId !== STATION_DISPATCHER_ROLE_ID) {
+        userData.fireStationId = null; // Отправляем null, чтобы откреплять пожарную часть
+      } else {
+        userData.fireStationId = editFireStationId;
+      }
       
       // Добавляем пароль только если он был введен
       if (editPassword) {
         userData.password = editPassword;
       }
       
+      console.log('Отправляемые данные:', userData);
+      
       const response = await api.put(`/api/user/${editUserId}`, userData);
       
-      // Обновляем список пользователей
-      setUsers(users.map(user => user.id === editUserId ? response.data : user));
+      console.log('Полученный ответ от сервера:', response.data);
       
-      toast.success('Пользователь успешно обновлен');
+      // Обновляем список пользователей
+      const updatedUser = response.data;
+      console.log('Пользователь до обновления:', users.find(user => user.id === editUserId));
+      console.log('Обновленный пользователь:', updatedUser);
+      
+      setUsers(users.map(user => user.id === editUserId ? updatedUser : user));
+      
+      toast({
+        title: 'Успешно',
+        description: 'Пользователь успешно обновлен',
+        variant: 'success'
+      });
       
       // Сброс формы
       cancelEditing();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating user:', error);
-      toast.error('Ошибка при обновлении пользователя');
+      
+      // Улучшенная обработка ошибок
+      if (error.response?.data?.message) {
+        toast({
+          title: 'Ошибка',
+          description: error.response.data.message,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: 'Ошибка при обновлении пользователя',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -203,25 +354,84 @@ export default function UsersAdminPage() {
       // Удаляем пользователя из списка
       setUsers(users.filter(user => user.id !== userId));
       
-      toast.success('Пользователь успешно удален');
-    } catch (error) {
+      toast({
+        title: 'Успешно',
+        description: 'Пользователь успешно удален',
+        variant: 'success'
+      });
+    } catch (error: any) {
       console.error('Error deleting user:', error);
-      toast.error('Ошибка при удалении пользователя');
+      toast({
+        title: 'Ошибка',
+        description: 'Ошибка при удалении пользователя',
+        variant: 'destructive'
+      });
     }
   };
   
   // Функция для отображения человекочитаемого названия роли
   const formatRoleName = (roleName: string): string => {
-    switch (roleName) {
+    // Приводим к нижнему регистру и обрабатываем возможные форматы
+    const normalizedName = roleName.toLowerCase();
+    
+    switch (normalizedName) {
       case 'admin':
         return 'Администратор';
       case 'central_dispatcher':
         return 'Центральный диспетчер';
       case 'station_dispatcher':
         return 'Диспетчер части';
+      // Обработка без подчеркиваний
+      case 'centraldispatcher':
+        return 'Центральный диспетчер';
+      case 'stationdispatcher':
+        return 'Диспетчер части';
+      // Обработка форматов из базы данных
+      case 'ADMIN'.toLowerCase():
+        return 'Администратор';
+      case 'CENTRAL_DISPATCHER'.toLowerCase():
+        return 'Центральный диспетчер';
+      case 'STATION_DISPATCHER'.toLowerCase():
+        return 'Диспетчер части';
       default:
+        console.log('Неизвестная роль:', roleName);
         return roleName;
     }
+  };
+  
+  // Вспомогательная функция для определения отображаемого имени роли
+  const getUserRoleName = (user: User): string => {
+    let roleName: string | undefined;
+    
+    // Проверяем, является ли role строкой (например, "ADMIN")
+    if (typeof user.role === 'string') {
+      roleName = formatRoleName(user.role);
+    }
+    // Проверяем наличие объекта role с полем name
+    else if (user.role && typeof user.role === 'object' && user.role.name) {
+      roleName = formatRoleName(user.role.name);
+    }
+    // Если нет объекта role с name, пробуем использовать roleId
+    else if (typeof user.roleId === 'number') {
+      const mappedRole = getRoleMappingValue(user.roleId);
+      if (mappedRole) {
+        roleName = formatRoleName(mappedRole);
+      }
+    }
+    
+    // Если роль не определена, логируем детали пользователя
+    if (!roleName || roleName === user.role) {
+      console.log('Не удалось определить роль для пользователя:', {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        roleType: typeof user.role,
+        roleId: user.roleId
+      });
+      return 'Неизвестная роль';
+    }
+    
+    return roleName;
   };
   
   // Если текущий пользователь не админ, показываем сообщение
@@ -290,7 +500,15 @@ export default function UsersAdminPage() {
                 <select
                   id="role"
                   value={newRoleId}
-                  onChange={(e) => setNewRoleId(Number(e.target.value))}
+                  onChange={(e) => {
+                    const newRoleId = Number(e.target.value);
+                    setNewRoleId(newRoleId);
+                    
+                    // Если новая роль не диспетчер станции, сбрасываем выбор пожарной части
+                    if (newRoleId !== STATION_DISPATCHER_ROLE_ID) {
+                      setNewFireStationId(undefined);
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                 >
@@ -304,7 +522,7 @@ export default function UsersAdminPage() {
               </div>
               
               {/* Показываем выбор пожарной части только для диспетчеров части */}
-              {newRoleId === 3 && (
+              {newRoleId === STATION_DISPATCHER_ROLE_ID && (
                 <div>
                   <label htmlFor="station" className="block text-sm font-medium text-gray-700 mb-1">
                     Пожарная часть*
@@ -385,7 +603,15 @@ export default function UsersAdminPage() {
                 <select
                   id="edit-role"
                   value={editRoleId}
-                  onChange={(e) => setEditRoleId(Number(e.target.value))}
+                  onChange={(e) => {
+                    const newRoleId = Number(e.target.value);
+                    setEditRoleId(newRoleId);
+                    
+                    // Если новая роль не диспетчер станции, сбрасываем выбор пожарной части
+                    if (newRoleId !== STATION_DISPATCHER_ROLE_ID) {
+                      setEditFireStationId(undefined);
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                 >
@@ -399,7 +625,7 @@ export default function UsersAdminPage() {
               </div>
               
               {/* Показываем выбор пожарной части только для диспетчеров части */}
-              {editRoleId === 3 && (
+              {editRoleId === STATION_DISPATCHER_ROLE_ID && (
                 <div>
                   <label htmlFor="edit-station" className="block text-sm font-medium text-gray-700 mb-1">
                     Пожарная часть*
@@ -479,7 +705,7 @@ export default function UsersAdminPage() {
                         {user.username}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatRoleName(user.role.name)}
+                        {getUserRoleName(user)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {user.fireStation ? user.fireStation.name : '-'}

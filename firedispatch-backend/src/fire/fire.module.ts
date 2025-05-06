@@ -5,10 +5,11 @@ import { FireEventsGateway } from './fire-events.gateway';
 import { UserModule } from '../user/user.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { FireLevelController } from './fire-level.controller';
+import { FireLevelRequirementController } from './fire-level-requirement.controller';
 
 @Module({
   imports: [UserModule, PrismaModule],
-  controllers: [FireController, FireLevelController],
+  controllers: [FireController, FireLevelController, FireLevelRequirementController],
   providers: [FireService, FireEventsGateway],
   exports: [FireService, FireEventsGateway]
 })

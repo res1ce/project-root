@@ -167,23 +167,24 @@ export function FireCreationModal({
       return;
     }
     
-    if (!fireLevelId) {
-      toast({
-        title: 'Ошибка',
-        description: 'Выберите уровень пожара',
-        variant: 'destructive'
-      });
-      return;
-    }
+    // Проверка выбрано ли "Авто" или обычный уровень, если "Авто", то levelId = -1
+    const isAutoLevel = fireLevelId === -1;
     
     try {
-      await createFire({
-        location: [location[0], location[1]],
-        levelId: fireLevelId,
+      const createFireData: any = {
+        location: [location[0], location[1]] as [number, number],
+        levelId: isAutoLevel ? undefined : fireLevelId, // Если выбрано "Авто", не отправляем levelId
         status: 'active',
         address: fireAddress,
         description: fireDescription || undefined
-      });
+      };
+      
+      // Если выбрано "Авто", добавляем флаг для бэкенда
+      if (isAutoLevel) {
+        Object.assign(createFireData, { autoLevel: true });
+      }
+      
+      await createFire(createFireData);
       
       toast({
         title: 'Успешно',
@@ -288,6 +289,7 @@ export function FireCreationModal({
               onChange={(e) => setFireLevelId(Number(e.target.value))}
             >
               <option value="">Выберите уровень</option>
+              <option value="-1">Авто (определить автоматически)</option>
               {levels && levels.length > 0 ? (
                 levels.map((level) => (
                   <option key={level.id} value={level.id}>

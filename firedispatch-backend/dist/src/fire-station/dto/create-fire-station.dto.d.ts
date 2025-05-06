@@ -3,4 +3,5 @@ export declare class CreateFireStationDto {
     address: string;
     latitude: number;
     longitude: number;
+    phoneNumber?: string;
 }

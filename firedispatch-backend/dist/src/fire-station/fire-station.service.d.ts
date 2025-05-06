@@ -11,6 +11,7 @@ export declare class FireStationService {
         address: string;
         latitude: number;
         longitude: number;
+        phoneNumber: string | null;
         createdAt: Date;
     }>;
     getAll(userId?: number, userRole?: UserRole | string): Promise<{
@@ -20,6 +21,7 @@ export declare class FireStationService {
         address: string;
         latitude: number;
         longitude: number;
+        phoneNumber: string | null;
         createdAt: Date;
     }[]>;
     getById(id: number): Promise<{
@@ -29,6 +31,7 @@ export declare class FireStationService {
         address: string;
         latitude: number;
         longitude: number;
+        phoneNumber: string | null;
         createdAt: Date;
     } | null>;
     update(id: number, dto: CreateFireStationDto): Promise<{
@@ -38,6 +41,7 @@ export declare class FireStationService {
         address: string;
         latitude: number;
         longitude: number;
+        phoneNumber: string | null;
         createdAt: Date;
     }>;
     delete(id: number): Promise<{
@@ -47,6 +51,7 @@ export declare class FireStationService {
         address: string;
         latitude: number;
         longitude: number;
+        phoneNumber: string | null;
         createdAt: Date;
     }>;
 }

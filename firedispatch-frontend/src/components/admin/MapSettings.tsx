@@ -1,23 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSystemSettingsStore } from '@/store/system-settings-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
-import { load } from '@2gis/mapgl';
-
-// Настройки маркера (обновленные для 2GIS)
-const DEFAULT_MARKER_OPTIONS = {
-  icon: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  size: [28, 42],
-  anchor: [14, 42],
-};
-
-// API ключ для 2GIS
-const API_KEY = process.env.NEXT_PUBLIC_2GIS_API_KEY || '';
+import DynamicMap from '@/components/fire-map/DynamicMap';
 
 export default function MapSettings() {
   const { settings, isLoading, error, fetchSettings, updateSettings } = useSystemSettingsStore();
@@ -25,12 +15,8 @@ export default function MapSettings() {
   const [latitude, setLatitude] = useState<number | ''>('');
   const [longitude, setLongitude] = useState<number | ''>('');
   const [zoom, setZoom] = useState<number | ''>('');
-  const [selectedPosition, setSelectedPosition] = useState<[number, number] | null>(null);
-  const [mapInitError, setMapInitError] = useState<string | null>(null);
-
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const [selectedMapCoordinates, setSelectedMapCoordinates] = useState<[number, number] | null>(null);
+  const [showMap, setShowMap] = useState(true);
 
   // Загрузка настроек при монтировании компонента
   useEffect(() => {
@@ -44,131 +30,22 @@ export default function MapSettings() {
       setLatitude(settings.defaultLatitude);
       setLongitude(settings.defaultLongitude);
       setZoom(settings.defaultZoom);
-      setSelectedPosition([settings.defaultLongitude, settings.defaultLatitude]); // [lng, lat] для 2GIS
+      setSelectedMapCoordinates([settings.defaultLongitude, settings.defaultLatitude]);
     }
   }, [settings]);
 
-  // Инициализация и обновление карты при изменении позиции
-  useEffect(() => {
-    if (!mapContainerRef.current || !selectedPosition) return;
+  // Обработчик выбора координат на карте
+  const handleMapCoordinatesSelect = (lat: number, lng: number) => {
+    setLatitude(lat);
+    setLongitude(lng);
+    setSelectedMapCoordinates([lng, lat]);
     
-    let mapglInstance: any;
-    let mapInstance: any;
-    
-    async function initMap() {
-      try {
-        console.log("Инициализация карты 2GIS в настройках...");
-        setMapInitError(null);
-        
-        // Проверка API ключа
-        if (!API_KEY) {
-          const error = "Отсутствует API ключ 2GIS";
-          console.error(error);
-          setMapInitError(error);
-          return;
-        }
-        
-        // Очищаем предыдущую карту, если она была
-        if (mapInstanceRef.current) {
-          if (markerRef.current) {
-            try {
-              markerRef.current.destroy();
-            } catch (e) {
-              console.error("Ошибка при удалении маркера:", e);
-            }
-            markerRef.current = null;
-          }
-          
-          try {
-            mapInstanceRef.current.destroy();
-          } catch (e) {
-            console.error("Ошибка при удалении карты:", e);
-          }
-          mapInstanceRef.current = null;
-        }
-        
-        // Загружаем SDK 2GIS
-        mapglInstance = await load();
-        
-        console.log("Создание карты с центром:", selectedPosition, "и зумом:", zoom || 12);
-        
-        // Создаем экземпляр карты
-        mapInstance = new mapglInstance.Map(mapContainerRef.current, {
-          center: selectedPosition,
-          zoom: zoom || 12,
-          key: API_KEY,
-        });
-        
-        mapInstanceRef.current = mapInstance;
-        
-        // Добавляем маркер выбранной позиции
-        markerRef.current = new mapglInstance.Marker(mapInstance, {
-          coordinates: selectedPosition,
-          icon: DEFAULT_MARKER_OPTIONS.icon,
-          size: DEFAULT_MARKER_OPTIONS.size,
-          anchor: DEFAULT_MARKER_OPTIONS.anchor,
-        });
-        
-        // Обработчик клика по карте для выбора позиции
-        mapInstance.on('click', (e: any) => {
-          const { lng, lat } = e.lngLat;
-          console.log("Выбрана новая позиция:", { lng, lat });
-          
-          // Обновляем маркер
-          if (markerRef.current) {
-            try {
-              markerRef.current.destroy();
-            } catch (e) {
-              console.error("Ошибка при удалении маркера:", e);
-            }
-          }
-          
-          markerRef.current = new mapglInstance.Marker(mapInstance, {
-            coordinates: [lng, lat],
-            icon: DEFAULT_MARKER_OPTIONS.icon,
-            size: DEFAULT_MARKER_OPTIONS.size,
-            anchor: DEFAULT_MARKER_OPTIONS.anchor,
-          });
-          
-          // Обновляем состояние
-          setLatitude(lat);
-          setLongitude(lng);
-          setSelectedPosition([lng, lat]); // [lng, lat] для 2GIS
-        });
-        
-        console.log("Карта 2GIS успешно инициализирована в настройках");
-      } catch (error) {
-        console.error("Ошибка инициализации карты 2GIS в настройках:", error);
-        setMapInitError(`Ошибка инициализации карты: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-      }
-    }
-    
-    initMap().catch(error => {
-      console.error("Неперехваченная ошибка при инициализации карты:", error);
-      setMapInitError(`Неперехваченная ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    // Добавляем уведомление для пользователя
+    toast({
+      title: 'Координаты выбраны',
+      description: `Широта: ${lat.toFixed(6)}, Долгота: ${lng.toFixed(6)}`,
     });
-    
-    return () => {
-      // Очистка ресурсов при размонтировании компонента
-      if (markerRef.current) {
-        try {
-          markerRef.current.destroy();
-        } catch (e) {
-          console.error("Ошибка при удалении маркера:", e);
-        }
-        markerRef.current = null;
-      }
-      
-      if (mapInstanceRef.current) {
-        try {
-          mapInstanceRef.current.destroy();
-        } catch (e) {
-          console.error("Ошибка при удалении карты:", e);
-        }
-        mapInstanceRef.current = null;
-      }
-    };
-  }, [selectedPosition, zoom]);
+  };
 
   // Обработчик отправки формы
   const handleSubmit = async (e: React.FormEvent) => {
@@ -186,17 +63,17 @@ export default function MapSettings() {
     
     try {
       // Обновление настроек
-    await updateSettings({
-      defaultCityName: cityName,
-      defaultLatitude: latitude,
-      defaultLongitude: longitude,
-      defaultZoom: zoom
-    });
+      await updateSettings({
+        defaultCityName: cityName,
+        defaultLatitude: latitude,
+        defaultLongitude: longitude,
+        defaultZoom: zoom
+      });
     
-    toast({
-      title: 'Успех',
-      description: 'Настройки карты успешно обновлены',
-    });
+      toast({
+        title: 'Успех',
+        description: 'Настройки карты успешно обновлены',
+      });
     } catch (error) {
       console.error("Ошибка обновления настроек:", error);
       toast({
@@ -206,18 +83,6 @@ export default function MapSettings() {
       });
     }
   };
-
-  // Обработчик изменения координат
-  const handleCoordinateChange = (lat: number | '', lng: number | '') => {
-    if (typeof lat === 'number' && typeof lng === 'number') {
-      setSelectedPosition([lng, lat]); // [lng, lat] для 2GIS
-    }
-  };
-
-  // Обновление позиции на карте при изменении координат в форме
-  useEffect(() => {
-    handleCoordinateChange(latitude, longitude);
-  }, [latitude, longitude]);
 
   if (isLoading && !settings) {
     return (
@@ -284,7 +149,13 @@ export default function MapSettings() {
                 max={90}
                 placeholder="Например: 52.0515"
                 value={latitude}
-                onChange={(e) => setLatitude(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) => {
+                  const lat = e.target.value ? Number(e.target.value) : '';
+                  setLatitude(lat);
+                  if (typeof lat === 'number' && typeof longitude === 'number') {
+                    setSelectedMapCoordinates([longitude, lat]);
+                  }
+                }}
                 required
               />
               <p className="text-xs text-gray-500">Значение от -90° до 90°</p>
@@ -300,26 +171,51 @@ export default function MapSettings() {
                 max={180}
                 placeholder="Например: 113.4712"
                 value={longitude}
-                onChange={(e) => setLongitude(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) => {
+                  const lng = e.target.value ? Number(e.target.value) : '';
+                  setLongitude(lng);
+                  if (typeof latitude === 'number' && typeof lng === 'number') {
+                    setSelectedMapCoordinates([lng, latitude]);
+                  }
+                }}
                 required
               />
               <p className="text-xs text-gray-500">Значение от -180° до 180°</p>
             </div>
           </div>
           
-          <div className="h-[400px] w-full mt-4 rounded-lg overflow-hidden border border-gray-200">
-            {mapInitError ? (
-              <div className="flex items-center justify-center h-full bg-red-50 text-red-700 p-4">
-                <p className="text-center">{mapInitError}</p>
-              </div>
-            ) : (
-              <div ref={mapContainerRef} className="h-full w-full" />
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowMap(!showMap)}
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+          >
+            {showMap ? 'Скрыть карту' : 'Показать карту для выбора координат'}
+          </button>
           
-          <div className="mt-2 text-sm text-gray-500">
-            <p>Кликните по карте, чтобы выбрать новое местоположение.</p>
-          </div>
+          {showMap && (
+            <div className="h-[400px] w-full mt-4 rounded-lg overflow-hidden border border-gray-200">
+              <DynamicMap 
+                allowCreation={true}
+                onLocationSelect={handleMapCoordinatesSelect}
+                showStations={false}
+                initialCenter={selectedMapCoordinates || undefined}
+                zoom={typeof zoom === 'number' ? zoom : undefined}
+              />
+            </div>
+          )}
+          
+          {selectedMapCoordinates && (
+            <div className="bg-blue-50 p-3 rounded-md">
+              <p className="text-sm font-medium text-blue-800">Выбранные координаты:</p>
+              <p className="text-sm text-blue-600">
+                Широта: {latitude !== '' ? Number(latitude).toFixed(6) : '-'}, 
+                Долгота: {longitude !== '' ? Number(longitude).toFixed(6) : '-'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Кликните по карте, чтобы выбрать новое местоположение
+              </p>
+            </div>
+          )}
           
           <Button 
             type="submit" 

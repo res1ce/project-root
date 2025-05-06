@@ -46,6 +46,7 @@ interface Fire {
   levelId: number;
   level?: {
     id: number;
+    level?: number;
     name: string;
     description: string;
   };
@@ -117,9 +118,9 @@ const getFireCoordinates = (fire: Fire): [number, number] => {
 // Функция для получения названия уровня пожара
 const getFireLevelName = (fire: Fire): string => {
   if (fire.level?.name) {
-    return `${fire.level.name} ${fire.level.description ? `- ${fire.level.description}` : ''}`;
+    return `${fire.level.level || fire.level.id} - ${fire.level.name}`;
   } else if (fire.fireLevel?.name) {
-    return `${fire.fireLevel.level} ${fire.fireLevel.name ? `- ${fire.fireLevel.name}` : ''}`;
+    return `${fire.fireLevel.level} - ${fire.fireLevel.name}`;
   }
   return `Уровень ${fire.levelId}`;
 };
@@ -310,7 +311,7 @@ export default function FireDetailsPage() {
               <div style="${POPUP_STYLES}">
                 <p style="font-weight: bold; margin: 0 0 8px; color: #d32f2f;">Пожар #${fire.id}</p>
                 <p style="margin: 0 0 5px;">Адрес: ${fire.address}</p>
-                <p style="margin: 0;">Уровень: ${fire.level?.name || ''} - ${fire.level?.description || ''}</p>
+                <p style="margin: 0;">Уровень: ${fire.level?.level || fire.levelId || ''} - ${fire.level?.name || ''}</p>
               </div>
             `,
             zIndex: 1000

@@ -23,96 +23,11 @@ export class FireController {
     private readonly userActivityService: UserActivityService
   ) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('central_dispatcher', 'station_dispatcher')
-  @Post()
-  async create(@Body() dto: CreateFireDto, @Req() req: RequestWithUser) {
-    try {
-      // Если уровень пожара не указан, определяем автоматически
-      if (!dto.levelId) {
-        dto.levelId = await this.fireService.determineFireLevel(dto.location);
-      }
-      
-      const result = await this.fireService.create(dto);
-      
-      // Логируем действие
-      await this.userActivityService.logActivity(
-        req.user.userId, 
-        'create_fire', 
-        { 
-          fireId: result.id, 
-          location: dto.location, 
-          levelId: dto.levelId,
-          isAutoLevel: !dto.levelId
-        },
-        req
-      );
-      
-      return result;
-    } catch (e) {
-      throw new BadRequestException(e.message);
-    }
-  }
-
   @UseGuards(JwtAuthGuard)
   @Get()
   getAll(@Req() req: RequestWithUser) {
     // Передаем ID пользователя и его роль в сервис для фильтрации пожаров
     return this.fireService.getAll(req.user.userId, req.user.role);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get(':id')
-  async getById(@Param('id') id: string) {
-    const numId = Number(id);
-    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
-    const fire = await this.fireService.getById(numId);
-    if (!fire) throw new NotFoundException(`Пожар с id ${id} не найден`);
-    return fire;
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('central_dispatcher', 'station_dispatcher')
-  @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: CreateFireDto, @Req() req: RequestWithUser) {
-    const numId = Number(id);
-    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
-    const result = await this.fireService.update(numId, dto);
-    if (!result) throw new NotFoundException(`Пожар с id ${id} не найден`);
-    await this.userActivityService.logActivity(
-      req.user.userId, 
-      'update_fire', 
-      { fireId: numId, updates: dto },
-      req
-    );
-    return result;
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('central_dispatcher', 'station_dispatcher')
-  @Delete(':id')
-  delete(@Param('id') id: string) {
-    return this.fireService.delete(Number(id));
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get(':id/assignments')
-  async getAssignments(@Param('id') id: string) {
-    const numId = Number(id);
-    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
-    const assignments = await this.fireService.getAssignmentsByFireId(numId);
-    if (!assignments || assignments.length === 0) throw new NotFoundException(`Назначения для пожара с id ${id} не найдены`);
-    return assignments;
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get(':id/history')
-  async getFireHistory(@Param('id') id: string) {
-    const numId = Number(id);
-    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
-    const history = await this.fireService.getFireHistory(numId);
-    if (!history || history.length === 0) throw new NotFoundException(`История для пожара с id ${id} не найдена`);
-    return history;
   }
 
   // --- CRUD FireLevelEngineRequirement ---
@@ -199,27 +114,6 @@ export class FireController {
     return this.fireService.deleteLevel(Number(id));
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('station_dispatcher')
-  @Put(':id/level')
-  async changeFireLevel(
-    @Param('id') id: string, 
-    @Body() dto: ChangeFireLevelDto,
-    @Req() req: RequestWithUser
-  ) {
-    const result = await this.fireService.changeFireLevel(Number(id), dto);
-    
-    // Логируем действие
-    await this.userActivityService.logActivity(
-      req.user.userId, 
-      'change_fire_level', 
-      { fireId: Number(id), newLevelId: dto.newLevel, reason: dto.reason },
-      req
-    );
-    
-    return result;
-  }
-
   // --- Управление адресами с предопределенными уровнями пожаров ---
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
@@ -256,6 +150,134 @@ export class FireController {
   @Delete('/address-level/:id')
   deleteAddressLevel(@Param('id') id: string) {
     return this.fireService.deleteAddressLevel(Number(id));
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('central_dispatcher')
+  @Post()
+  async create(@Body() dto: CreateFireDto, @Req() req: RequestWithUser) {
+    // Получаем текущего пользователя из запроса
+    const userId = req.user.userId;
+    
+    // Устанавливаем reportedById из текущего пользователя
+    dto.reportedById = userId;
+    
+    // Если указан флаг autoLevel, автоматически определяем уровень пожара
+    if (dto.autoLevel) {
+      // Используем адрес и координаты для определения уровня пожара
+      const determinedLevel = await this.fireService.determineFireLevel(dto.location, dto.address);
+      
+      // Получаем ID уровня пожара на основе его номера
+      const fireLevel = await this.fireService.getLevelByNumber(determinedLevel);
+      if (fireLevel) {
+        dto.levelId = fireLevel.id;
+      } else {
+        // Если уровень не найден, используем первый доступный
+        const firstLevel = await this.fireService.getFirstLevel();
+        if (firstLevel) {
+          dto.levelId = firstLevel.id;
+        } else {
+          throw new BadRequestException('В системе не настроены уровни пожаров');
+        }
+      }
+    }
+    
+    // Проверяем, что уровень пожара указан
+    if (!dto.levelId) {
+      throw new BadRequestException('Необходимо указать уровень пожара или включить автоматическое определение');
+    }
+    
+    const result = await this.fireService.create(dto);
+    
+    // Логируем создание пожара
+    await this.userActivityService.logActivity(
+      userId,
+      'create_fire',
+      {
+        fireId: result.id,
+        location: dto.location,
+        levelId: dto.levelId,
+        autoLevel: dto.autoLevel || false
+      },
+      req
+    );
+    
+    return result;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  async getById(@Param('id') id: string) {
+    const numId = Number(id);
+    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
+    const fire = await this.fireService.getById(numId);
+    if (!fire) throw new NotFoundException(`Пожар с id ${id} не найден`);
+    return fire;
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('central_dispatcher', 'station_dispatcher')
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() dto: CreateFireDto, @Req() req: RequestWithUser) {
+    const numId = Number(id);
+    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
+    const result = await this.fireService.update(numId, dto);
+    if (!result) throw new NotFoundException(`Пожар с id ${id} не найден`);
+    await this.userActivityService.logActivity(
+      req.user.userId, 
+      'update_fire', 
+      { fireId: numId, updates: dto },
+      req
+    );
+    return result;
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('central_dispatcher', 'station_dispatcher')
+  @Delete(':id')
+  delete(@Param('id') id: string) {
+    return this.fireService.delete(Number(id));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/assignments')
+  async getAssignments(@Param('id') id: string) {
+    const numId = Number(id);
+    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
+    const assignments = await this.fireService.getAssignmentsByFireId(numId);
+    if (!assignments || assignments.length === 0) throw new NotFoundException(`Назначения для пожара с id ${id} не найдены`);
+    return assignments;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/history')
+  async getFireHistory(@Param('id') id: string) {
+    const numId = Number(id);
+    if (!numId || isNaN(numId)) throw new BadRequestException('Некорректный id');
+    const history = await this.fireService.getFireHistory(numId);
+    if (!history || history.length === 0) throw new NotFoundException(`История для пожара с id ${id} не найдена`);
+    return history;
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('station_dispatcher')
+  @Put(':id/level')
+  async changeFireLevel(
+    @Param('id') id: string, 
+    @Body() dto: ChangeFireLevelDto,
+    @Req() req: RequestWithUser
+  ) {
+    const result = await this.fireService.changeFireLevel(Number(id), dto);
+    
+    // Логируем действие
+    await this.userActivityService.logActivity(
+      req.user.userId, 
+      'change_fire_level', 
+      { fireId: Number(id), newLevelId: dto.newLevel, reason: dto.reason },
+      req
+    );
+    
+    return result;
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

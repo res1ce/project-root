@@ -25,6 +25,7 @@ let FireStationService = class FireStationService {
                 address: dto.address,
                 latitude: dto.latitude,
                 longitude: dto.longitude,
+                phoneNumber: dto.phoneNumber,
             },
         });
     }
@@ -65,6 +66,7 @@ let FireStationService = class FireStationService {
                 address: dto.address,
                 latitude: dto.latitude,
                 longitude: dto.longitude,
+                phoneNumber: dto.phoneNumber,
             },
         });
     }

@@ -19,6 +19,7 @@ const websocket_module_1 = require("./websocket/websocket.module");
 const system_settings_module_1 = require("./system-settings/system-settings.module");
 const dashboard_module_1 = require("./dashboard/dashboard.module");
 const engine_type_module_1 = require("./engine-type/engine-type.module");
+const fire_engine_module_1 = require("./fire-engine/fire-engine.module");
 const configuration_1 = require("./config/configuration");
 let AppModule = class AppModule {
 };
@@ -40,6 +41,7 @@ exports.AppModule = AppModule = __decorate([
             system_settings_module_1.SystemSettingsModule,
             dashboard_module_1.DashboardModule,
             engine_type_module_1.EngineTypeModule,
+            fire_engine_module_1.FireEngineModule,
         ],
     })
 ], AppModule);

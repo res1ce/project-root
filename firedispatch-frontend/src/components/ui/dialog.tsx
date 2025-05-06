@@ -4,6 +4,11 @@ import * as React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Создаем контекст для передачи функции закрытия
+const DialogContext = React.createContext<{ onClose: () => void }>({
+  onClose: () => {},
+});
+
 interface DialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -27,16 +32,18 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="w-full max-w-md">{children}</div>
-      
-      {/* Close on overlay click */}
-      <div 
-        className="absolute inset-0 -z-10" 
-        onClick={handleClose}
-        aria-hidden="true"
-      />
-    </div>
+    <DialogContext.Provider value={{ onClose: handleClose }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="w-full max-w-md">{children}</div>
+        
+        {/* Close on overlay click */}
+        <div 
+          className="absolute inset-0 -z-10" 
+          onClick={handleClose}
+          aria-hidden="true"
+        />
+      </div>
+    </DialogContext.Provider>
   );
 }
 
@@ -53,6 +60,8 @@ export function DialogContent({
         "bg-white rounded-lg shadow-lg overflow-hidden max-h-[85vh] flex flex-col",
         className
       )}
+      role="dialog"
+      aria-modal="true"
     >
       {children}
     </div>
@@ -66,6 +75,9 @@ export function DialogHeader({
   className?: string;
   children: React.ReactNode;
 }) {
+  // Получаем функцию закрытия из контекста
+  const { onClose } = React.useContext(DialogContext);
+  
   return (
     <div
       className={cn(
@@ -77,13 +89,7 @@ export function DialogHeader({
       <button 
         type="button" 
         className="rounded-full p-1 hover:bg-gray-100 transition-colors"
-        onClick={() => {
-          const dialog = document.querySelector('[role="dialog"]')?.parentElement;
-          if (dialog) {
-            const event = new Event('click', { bubbles: true });
-            dialog.dispatchEvent(event);
-          }
-        }}
+        onClick={onClose}
         aria-label="Close"
       >
         <X className="h-5 w-5 text-gray-500" />

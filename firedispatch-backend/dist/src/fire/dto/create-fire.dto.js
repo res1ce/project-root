@@ -21,6 +21,7 @@ class CreateFireDto {
     reportedById;
     assignedToId;
     assignedStationId;
+    autoLevel;
 }
 exports.CreateFireDto = CreateFireDto;
 __decorate([
@@ -51,6 +52,7 @@ __decorate([
     __metadata("design:type", String)
 ], CreateFireDto.prototype, "address", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], CreateFireDto.prototype, "reportedById", void 0);
@@ -64,4 +66,9 @@ __decorate([
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], CreateFireDto.prototype, "assignedStationId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateFireDto.prototype, "autoLevel", void 0);
 //# sourceMappingURL=create-fire.dto.js.map

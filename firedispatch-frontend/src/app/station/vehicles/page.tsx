@@ -44,7 +44,30 @@ export default function StationVehiclesPage() {
         // Получаем типы машин
         const typesResponse = await api.get<FireEngineType[]>('/api/engine-type');
         
-        setVehicles(vehiclesResponse.data);
+        console.log('Данные о машинах:', vehiclesResponse.data);
+        console.log('Типы машин:', typesResponse.data);
+        
+        // Адаптируем данные с бэкенда
+        const adaptedVehicles = vehiclesResponse.data.map(vehicle => {
+          // Получаем индекс типа машины в массиве типов
+          const typeIndex = typesResponse.data.findIndex(type => type.name === (vehicle as any).type);
+          
+          return {
+            ...vehicle,
+            // Преобразуем поле type (строка) в typeId (число)
+            typeId: typeIndex !== -1 ? typeIndex + 1 : 1,
+            // Преобразуем поле status (AVAILABLE, ON_DUTY, MAINTENANCE) в isAvailable (boolean)
+            isAvailable: (vehicle as any).status === 'AVAILABLE',
+            // Добавляем поле stationId из fireStationId
+            stationId: (vehicle as any).fireStationId,
+            // Добавляем поле с описанием типа для отображения
+            typeName: typeIndex !== -1 ? typesResponse.data[typeIndex].description : 'Неизвестный тип'
+          };
+        });
+        
+        console.log('Адаптированные данные о машинах:', adaptedVehicles);
+        
+        setVehicles(adaptedVehicles);
         setEngineTypes(typesResponse.data);
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);
@@ -62,6 +85,17 @@ export default function StationVehiclesPage() {
       fetchData();
     }
   }, [user]);
+
+  // Функция закрытия модального окна
+  const closeDialog = () => {
+    // Сначала закрываем окно
+    setIsDialogOpen(false);
+    
+    // Затем сбрасываем состояние, если не находимся в режиме редактирования
+    if (!isEditMode) {
+      setCurrentVehicle({ isAvailable: true });
+    }
+  };
 
   // Открываем диалог добавления новой машины
   const handleAddVehicle = () => {
@@ -114,15 +148,39 @@ export default function StationVehiclesPage() {
     }
 
     try {
+      // Найдем тип машины по typeId
+      const selectedType = engineTypes.find(t => t.id === currentVehicle.typeId);
+      if (!selectedType) {
+        throw new Error('Не удалось найти выбранный тип машины');
+      }
+      
+      // Подготовим данные для отправки на бэкенд
+      const vehicleData = {
+        model: currentVehicle.model,
+        type: selectedType.name, // На бэкенде ожидается строка с именем типа
+        fireStationId: user?.fireStationId, // ID пожарной части диспетчера
+        status: currentVehicle.isAvailable ? 'AVAILABLE' : 'ON_DUTY' // Статус машины
+      };
+      
+      console.log('Отправляемые данные:', vehicleData);
+
       if (isEditMode && currentVehicle.id) {
         // Обновление существующей
         const response = await api.put<FireEngine>(
           `/api/fire-engine/${currentVehicle.id}`, 
-          currentVehicle
+          vehicleData
         );
         
-        // Обновляем список машин
-        setVehicles(vehicles.map(v => v.id === currentVehicle.id ? response.data : v));
+        // Обновляем список машин с адаптацией данных
+        const updatedVehicle = {
+          ...response.data,
+          typeId: currentVehicle.typeId,
+          isAvailable: vehicleData.status === 'AVAILABLE',
+          stationId: (response.data as any).fireStationId,
+          typeName: selectedType.description || selectedType.name
+        };
+        
+        setVehicles(vehicles.map(v => v.id === currentVehicle.id ? updatedVehicle : v));
         
         toast({
           title: 'Успех',
@@ -131,10 +189,18 @@ export default function StationVehiclesPage() {
         });
       } else {
         // Создание новой
-        const response = await api.post<FireEngine>('/api/fire-engine', currentVehicle);
+        const response = await api.post<FireEngine>('/api/fire-engine', vehicleData);
         
-        // Добавляем новую машину в список
-        setVehicles([...vehicles, response.data]);
+        // Добавляем новую машину в список с адаптацией данных
+        const newVehicle = {
+          ...response.data,
+          typeId: currentVehicle.typeId,
+          isAvailable: vehicleData.status === 'AVAILABLE',
+          stationId: (response.data as any).fireStationId,
+          typeName: selectedType.description || selectedType.name
+        };
+        
+        setVehicles([...vehicles, newVehicle]);
         
         toast({
           title: 'Успех',
@@ -144,7 +210,7 @@ export default function StationVehiclesPage() {
       }
       
       // Закрываем диалог
-      setIsDialogOpen(false);
+      closeDialog();
     } catch (error) {
       console.error('Ошибка при сохранении машины:', error);
       toast({
@@ -158,7 +224,7 @@ export default function StationVehiclesPage() {
   // Получаем название типа машины по ID
   const getEngineTypeName = (typeId: number): string => {
     const type = engineTypes.find(t => t.id === typeId);
-    return type ? type.name : 'Неизвестный тип';
+    return type?.description || 'Неизвестный тип';
   };
 
   return (
@@ -201,7 +267,7 @@ export default function StationVehiclesPage() {
                   <TableCell>
                     <div className="font-medium">{vehicle.model}</div>
                   </TableCell>
-                  <TableCell>{getEngineTypeName(vehicle.typeId)}</TableCell>
+                  <TableCell>{vehicle.typeName || getEngineTypeName(vehicle.typeId)}</TableCell>
                   <TableCell>
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       vehicle.isAvailable 
@@ -216,17 +282,17 @@ export default function StationVehiclesPage() {
                       variant="ghost" 
                       size="sm" 
                       onClick={() => handleEditVehicle(vehicle)}
-                      className="text-blue-600 hover:text-blue-800 mr-2"
+                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 mr-2"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-5 w-5 text-blue-600" />
                     </Button>
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       onClick={() => handleDeleteVehicle(vehicle.id)}
-                      className="text-red-600 hover:text-red-800"
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-5 w-5 text-red-600" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -235,72 +301,94 @@ export default function StationVehiclesPage() {
           </Table>
         )}
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
+        <Dialog 
+          open={isDialogOpen} 
+          onOpenChange={(open) => {
+            if (!open) closeDialog();
+          }}
+        >
+          <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl p-6">
+            <DialogHeader className="pb-4 border-b">
+              <DialogTitle className="text-xl font-semibold">
                 {isEditMode ? 'Редактирование пожарной машины' : 'Добавление пожарной машины'}
               </DialogTitle>
             </DialogHeader>
             
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="model" className="text-right">
-                  Модель *
-                </Label>
-                <Input
-                  id="model"
-                  value={currentVehicle.model || ''}
-                  onChange={(e) => setCurrentVehicle({...currentVehicle, model: e.target.value})}
-                  className="col-span-3"
-                  placeholder="Например: АЦ-40"
-                />
-              </div>
+            <div className="grid gap-6 py-6 px-1">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="model" className="text-sm font-medium">
+                    Модель пожарной машины *
+                  </Label>
+                  <Input
+                    id="model"
+                    value={currentVehicle.model || ''}
+                    onChange={(e) => setCurrentVehicle({...currentVehicle, model: e.target.value})}
+                    className="w-full px-3 py-2"
+                    placeholder="Например: АЦ-40"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Укажите модель и маркировку пожарной машины
+                  </p>
+                </div>
               
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="engineType" className="text-right">
-                  Тип машины *
-                </Label>
-                <div className="col-span-3">
+                <div className="space-y-2 mt-2">
+                  <Label htmlFor="engineType" className="text-sm font-medium">
+                    Тип пожарной машины *
+                  </Label>
                   <select
                     id="engineType"
-                    className="block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     value={currentVehicle.typeId?.toString() || ''}
                     onChange={(e) => setCurrentVehicle({...currentVehicle, typeId: Number(e.target.value)})}
                   >
                     <option value="">Выберите тип</option>
                     {engineTypes.map(type => (
-                      <option key={type.id} value={type.id.toString()}>{type.name}</option>
+                      <option key={type.id} value={type.id.toString()}>
+                        {type.description || type.name}
+                      </option>
                     ))}
                   </select>
+                  <p className="text-xs text-gray-500">
+                    Выберите тип пожарной машины из списка
+                  </p>
                 </div>
-              </div>
               
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">
-                  Статус
-                </Label>
-                <div className="col-span-3 flex items-center">
-                  <input
-                    type="checkbox"
-                    id="isAvailable"
-                    className="h-4 w-4 text-red-600 rounded"
-                    checked={currentVehicle.isAvailable || false}
-                    onChange={(e) => setCurrentVehicle({...currentVehicle, isAvailable: e.target.checked})}
-                  />
-                  <Label htmlFor="isAvailable" className="ml-2">
-                    Доступна для выезда
+                <div className="space-y-2 mt-2">
+                  <Label className="text-sm font-medium">
+                    Статус машины
                   </Label>
+                  <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-md">
+                    <input
+                      type="checkbox"
+                      id="isAvailable"
+                      className="h-4 w-4 text-red-600 rounded focus:ring-red-500"
+                      checked={currentVehicle.isAvailable || false}
+                      onChange={(e) => setCurrentVehicle({...currentVehicle, isAvailable: e.target.checked})}
+                    />
+                    <Label htmlFor="isAvailable" className="text-sm">
+                      Доступна для выезда
+                    </Label>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Если машина может быть отправлена на пожар, она должна быть отмечена как доступная
+                  </p>
                 </div>
               </div>
             </div>
             
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Отмена
+            <DialogFooter className="pt-4 border-t flex-row-reverse space-x-2 space-x-reverse">
+              <Button 
+                onClick={handleSaveVehicle} 
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2"
+              >
+                {isEditMode ? 'Сохранить изменения' : 'Добавить машину'}
               </Button>
-              <Button onClick={handleSaveVehicle}>
-                Сохранить
+              <Button 
+                variant="secondary" 
+                onClick={closeDialog}
+              >
+                Отмена
               </Button>
             </DialogFooter>
           </DialogContent>

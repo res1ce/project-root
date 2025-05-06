@@ -31,66 +31,8 @@ let FireController = class FireController {
         this.fireService = fireService;
         this.userActivityService = userActivityService;
     }
-    async create(dto, req) {
-        try {
-            if (!dto.levelId) {
-                dto.levelId = await this.fireService.determineFireLevel(dto.location);
-            }
-            const result = await this.fireService.create(dto);
-            await this.userActivityService.logActivity(req.user.userId, 'create_fire', {
-                fireId: result.id,
-                location: dto.location,
-                levelId: dto.levelId,
-                isAutoLevel: !dto.levelId
-            }, req);
-            return result;
-        }
-        catch (e) {
-            throw new common_1.BadRequestException(e.message);
-        }
-    }
     getAll(req) {
         return this.fireService.getAll(req.user.userId, req.user.role);
-    }
-    async getById(id) {
-        const numId = Number(id);
-        if (!numId || isNaN(numId))
-            throw new common_1.BadRequestException('Некорректный id');
-        const fire = await this.fireService.getById(numId);
-        if (!fire)
-            throw new common_1.NotFoundException(`Пожар с id ${id} не найден`);
-        return fire;
-    }
-    async update(id, dto, req) {
-        const numId = Number(id);
-        if (!numId || isNaN(numId))
-            throw new common_1.BadRequestException('Некорректный id');
-        const result = await this.fireService.update(numId, dto);
-        if (!result)
-            throw new common_1.NotFoundException(`Пожар с id ${id} не найден`);
-        await this.userActivityService.logActivity(req.user.userId, 'update_fire', { fireId: numId, updates: dto }, req);
-        return result;
-    }
-    delete(id) {
-        return this.fireService.delete(Number(id));
-    }
-    async getAssignments(id) {
-        const numId = Number(id);
-        if (!numId || isNaN(numId))
-            throw new common_1.BadRequestException('Некорректный id');
-        const assignments = await this.fireService.getAssignmentsByFireId(numId);
-        if (!assignments || assignments.length === 0)
-            throw new common_1.NotFoundException(`Назначения для пожара с id ${id} не найдены`);
-        return assignments;
-    }
-    async getFireHistory(id) {
-        const numId = Number(id);
-        if (!numId || isNaN(numId))
-            throw new common_1.BadRequestException('Некорректный id');
-        const history = await this.fireService.getFireHistory(numId);
-        if (!history || history.length === 0)
-            throw new common_1.NotFoundException(`История для пожара с id ${id} не найдена`);
-        return history;
     }
     getAllRequirements() {
         return this.fireService.getAllRequirements();
@@ -140,11 +82,6 @@ let FireController = class FireController {
     deleteLevel(id) {
         return this.fireService.deleteLevel(Number(id));
     }
-    async changeFireLevel(id, dto, req) {
-        const result = await this.fireService.changeFireLevel(Number(id), dto);
-        await this.userActivityService.logActivity(req.user.userId, 'change_fire_level', { fireId: Number(id), newLevelId: dto.newLevel, reason: dto.reason }, req);
-        return result;
-    }
     getAllAddressLevels() {
         return this.fireService.getAllAddressLevels();
     }
@@ -163,6 +100,82 @@ let FireController = class FireController {
     deleteAddressLevel(id) {
         return this.fireService.deleteAddressLevel(Number(id));
     }
+    async create(dto, req) {
+        const userId = req.user.userId;
+        dto.reportedById = userId;
+        if (dto.autoLevel) {
+            const determinedLevel = await this.fireService.determineFireLevel(dto.location, dto.address);
+            const fireLevel = await this.fireService.getLevelByNumber(determinedLevel);
+            if (fireLevel) {
+                dto.levelId = fireLevel.id;
+            }
+            else {
+                const firstLevel = await this.fireService.getFirstLevel();
+                if (firstLevel) {
+                    dto.levelId = firstLevel.id;
+                }
+                else {
+                    throw new common_1.BadRequestException('В системе не настроены уровни пожаров');
+                }
+            }
+        }
+        if (!dto.levelId) {
+            throw new common_1.BadRequestException('Необходимо указать уровень пожара или включить автоматическое определение');
+        }
+        const result = await this.fireService.create(dto);
+        await this.userActivityService.logActivity(userId, 'create_fire', {
+            fireId: result.id,
+            location: dto.location,
+            levelId: dto.levelId,
+            autoLevel: dto.autoLevel || false
+        }, req);
+        return result;
+    }
+    async getById(id) {
+        const numId = Number(id);
+        if (!numId || isNaN(numId))
+            throw new common_1.BadRequestException('Некорректный id');
+        const fire = await this.fireService.getById(numId);
+        if (!fire)
+            throw new common_1.NotFoundException(`Пожар с id ${id} не найден`);
+        return fire;
+    }
+    async update(id, dto, req) {
+        const numId = Number(id);
+        if (!numId || isNaN(numId))
+            throw new common_1.BadRequestException('Некорректный id');
+        const result = await this.fireService.update(numId, dto);
+        if (!result)
+            throw new common_1.NotFoundException(`Пожар с id ${id} не найден`);
+        await this.userActivityService.logActivity(req.user.userId, 'update_fire', { fireId: numId, updates: dto }, req);
+        return result;
+    }
+    delete(id) {
+        return this.fireService.delete(Number(id));
+    }
+    async getAssignments(id) {
+        const numId = Number(id);
+        if (!numId || isNaN(numId))
+            throw new common_1.BadRequestException('Некорректный id');
+        const assignments = await this.fireService.getAssignmentsByFireId(numId);
+        if (!assignments || assignments.length === 0)
+            throw new common_1.NotFoundException(`Назначения для пожара с id ${id} не найдены`);
+        return assignments;
+    }
+    async getFireHistory(id) {
+        const numId = Number(id);
+        if (!numId || isNaN(numId))
+            throw new common_1.BadRequestException('Некорректный id');
+        const history = await this.fireService.getFireHistory(numId);
+        if (!history || history.length === 0)
+            throw new common_1.NotFoundException(`История для пожара с id ${id} не найдена`);
+        return history;
+    }
+    async changeFireLevel(id, dto, req) {
+        const result = await this.fireService.changeFireLevel(Number(id), dto);
+        await this.userActivityService.logActivity(req.user.userId, 'change_fire_level', { fireId: Number(id), newLevelId: dto.newLevel, reason: dto.reason }, req);
+        return result;
+    }
     async resolveFire(id, req) {
         const numId = Number(id);
         if (!numId || isNaN(numId))
@@ -174,16 +187,6 @@ let FireController = class FireController {
 };
 exports.FireController = FireController;
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('central_dispatcher', 'station_dispatcher'),
-    (0, common_1.Post)(),
-    __param(0, (0, common_1.Body)()),
-    __param(1, (0, common_1.Req)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_fire_dto_1.CreateFireDto, Object]),
-    __metadata("design:returntype", Promise)
-], FireController.prototype, "create", null);
-__decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(),
     __param(0, (0, common_1.Req)()),
@@ -191,50 +194,6 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], FireController.prototype, "getAll", null);
-__decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], FireController.prototype, "getById", null);
-__decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('central_dispatcher', 'station_dispatcher'),
-    (0, common_1.Put)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
-    __param(2, (0, common_1.Req)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, create_fire_dto_1.CreateFireDto, Object]),
-    __metadata("design:returntype", Promise)
-], FireController.prototype, "update", null);
-__decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('central_dispatcher', 'station_dispatcher'),
-    (0, common_1.Delete)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], FireController.prototype, "delete", null);
-__decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, common_1.Get)(':id/assignments'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], FireController.prototype, "getAssignments", null);
-__decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, common_1.Get)(':id/history'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], FireController.prototype, "getFireHistory", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('admin'),
@@ -327,17 +286,6 @@ __decorate([
 ], FireController.prototype, "deleteLevel", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('station_dispatcher'),
-    (0, common_1.Put)(':id/level'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
-    __param(2, (0, common_1.Req)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, change_fire_level_dto_1.ChangeFireLevelDto, Object]),
-    __metadata("design:returntype", Promise)
-], FireController.prototype, "changeFireLevel", null);
-__decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('admin'),
     (0, common_1.Get)('/address-level'),
     __metadata("design:type", Function),
@@ -381,6 +329,71 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], FireController.prototype, "deleteAddressLevel", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('central_dispatcher'),
+    (0, common_1.Post)(),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [create_fire_dto_1.CreateFireDto, Object]),
+    __metadata("design:returntype", Promise)
+], FireController.prototype, "create", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], FireController.prototype, "getById", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('central_dispatcher', 'station_dispatcher'),
+    (0, common_1.Put)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, create_fire_dto_1.CreateFireDto, Object]),
+    __metadata("design:returntype", Promise)
+], FireController.prototype, "update", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('central_dispatcher', 'station_dispatcher'),
+    (0, common_1.Delete)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], FireController.prototype, "delete", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)(':id/assignments'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], FireController.prototype, "getAssignments", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)(':id/history'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], FireController.prototype, "getFireHistory", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('station_dispatcher'),
+    (0, common_1.Put)(':id/level'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, change_fire_level_dto_1.ChangeFireLevelDto, Object]),
+    __metadata("design:returntype", Promise)
+], FireController.prototype, "changeFireLevel", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('central_dispatcher', 'station_dispatcher'),

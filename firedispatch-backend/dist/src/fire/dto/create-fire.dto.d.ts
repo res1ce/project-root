@@ -5,7 +5,8 @@ export declare class CreateFireDto {
     status?: IncidentStatus;
     description?: string;
     address?: string;
-    reportedById: number;
+    reportedById?: number;
     assignedToId?: number;
     assignedStationId?: number;
+    autoLevel?: boolean;
 }

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useCallback } from 'react';
 import AppLayout from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
+import DynamicMap from '@/components/fire-map/DynamicMap';
 
 interface FireStation {
   id: number;
@@ -31,6 +32,9 @@ export default function FireStationsAdminPage() {
   const [stationPhoneNumber, setStationPhoneNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [showMap, setShowMap] = useState(false);
+  const [selectedMapCoordinates, setSelectedMapCoordinates] = useState<[number, number] | null>(null);
+
   // Получение данных
   const fetchStations = async () => {
     try {
@@ -50,6 +54,13 @@ export default function FireStationsAdminPage() {
     fetchStations();
   }, []);
   
+  // Обработчик выбора координат на карте
+  const handleMapCoordinatesSelect = useCallback((lat: number, lng: number) => {
+    setStationLatitude(lat.toString());
+    setStationLongitude(lng.toString());
+    setSelectedMapCoordinates([lat, lng]);
+  }, []);
+  
   const resetForm = () => {
     setStationName('');
     setStationAddress('');
@@ -59,6 +70,8 @@ export default function FireStationsAdminPage() {
     setSelectedStationId(null);
     setIsAddingStation(false);
     setIsEditingStation(false);
+    setShowMap(false);
+    setSelectedMapCoordinates(null);
   };
   
   const handleEditStation = (station: FireStation) => {
@@ -70,6 +83,8 @@ export default function FireStationsAdminPage() {
     setSelectedStationId(station.id);
     setIsEditingStation(true);
     setIsAddingStation(false);
+    // Устанавливаем координаты для отображения на карте
+    setSelectedMapCoordinates([station.latitude, station.longitude]);
   };
   
   const handleSubmit = async (e: FormEvent) => {
@@ -198,32 +213,75 @@ export default function FireStationsAdminPage() {
                   />
                 </div>
                 
-                <div>
-                  <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 mb-1">
-                    Широта*
-                  </label>
-                  <input
-                    id="latitude"
-                    type="text"
-                    value={stationLatitude}
-                    onChange={(e) => setStationLatitude(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 mb-1">
-                    Долгота*
-                  </label>
-                  <input
-                    id="longitude"
-                    type="text"
-                    value={stationLongitude}
-                    onChange={(e) => setStationLongitude(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
+                <div className="col-span-1 md:col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 mb-1">
+                        Широта*
+                      </label>
+                      <input
+                        id="latitude"
+                        type="text"
+                        value={stationLatitude}
+                        onChange={(e) => {
+                          setStationLatitude(e.target.value);
+                          if (!isNaN(parseFloat(e.target.value)) && !isNaN(parseFloat(stationLongitude))) {
+                            setSelectedMapCoordinates([parseFloat(e.target.value), parseFloat(stationLongitude)]);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 mb-1">
+                        Долгота*
+                      </label>
+                      <input
+                        id="longitude"
+                        type="text"
+                        value={stationLongitude}
+                        onChange={(e) => {
+                          setStationLongitude(e.target.value);
+                          if (!isNaN(parseFloat(stationLatitude)) && !isNaN(parseFloat(e.target.value))) {
+                            setSelectedMapCoordinates([parseFloat(stationLatitude), parseFloat(e.target.value)]);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowMap(!showMap)}
+                    className="mb-4 text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                  >
+                    {showMap ? 'Скрыть карту' : 'Показать карту для выбора координат'}
+                  </button>
+                  
+                  {showMap && (
+                    <div className="border rounded-md overflow-hidden h-[400px] mb-4">
+                      <DynamicMap 
+                        allowCreation={true}
+                        onLocationSelect={handleMapCoordinatesSelect}
+                        showStations={false}
+                        initialCenter={selectedMapCoordinates || undefined}
+                      />
+                    </div>
+                  )}
+                  
+                  {selectedMapCoordinates && (
+                    <div className="bg-blue-50 p-3 rounded-md mb-4">
+                      <p className="text-sm font-medium text-blue-800">Выбранные координаты:</p>
+                      <p className="text-sm text-blue-600">
+                        Широта: {selectedMapCoordinates[0].toFixed(6)}, 
+                        Долгота: {selectedMapCoordinates[1].toFixed(6)}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 
                 <div>
@@ -309,16 +367,16 @@ export default function FireStationsAdminPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {station.phoneNumber || '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button 
-                          className="text-indigo-600 hover:text-indigo-900 mr-3"
                           onClick={() => handleEditStation(station)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
                         >
                           Редактировать
                         </button>
                         <button 
-                          className="text-red-600 hover:text-red-900"
                           onClick={() => handleDeleteStation(station.id)}
+                          className="text-red-600 hover:text-red-900"
                         >
                           Удалить
                         </button>

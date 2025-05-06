@@ -336,13 +336,7 @@ let FireService = class FireService {
     async getAllLevels() {
         return this.prisma.fireLevel.findMany({
             include: {
-                requirements: {
-                    select: {
-                        id: true,
-                        count: true,
-                        vehicleType: true
-                    }
-                }
+                requirements: true
             },
             orderBy: {
                 level: 'asc'
@@ -350,20 +344,24 @@ let FireService = class FireService {
         });
     }
     async getLevelById(id) {
-        const levelId = Number(id);
-        if (isNaN(levelId)) {
-            throw new common_1.BadRequestException('Некорректный ID уровня пожара');
-        }
-        const level = await this.prisma.fireLevel.findUnique({
-            where: { id: levelId },
+        return this.prisma.fireLevel.findUnique({
+            where: { id },
             include: {
                 requirements: true
             }
         });
-        if (!level) {
-            throw new common_1.NotFoundException(`Уровень пожара с ID ${id} не найден`);
-        }
-        return level;
+    }
+    async getLevelByNumber(level) {
+        return this.prisma.fireLevel.findUnique({
+            where: { level }
+        });
+    }
+    async getFirstLevel() {
+        return this.prisma.fireLevel.findFirst({
+            orderBy: {
+                level: 'asc'
+            }
+        });
     }
     async createLevel(dto) {
         const existingLevel = await this.prisma.fireLevel.findUnique({
@@ -512,8 +510,24 @@ let FireService = class FireService {
         return deg * (Math.PI / 180);
     }
     async determineFireLevel(location, address) {
+        const [longitude, latitude] = location;
         if (address) {
-            const addressLevel = await this.prisma.fireAddressLevel.findFirst({
+            const exactAddressMatch = await this.prisma.fireAddressLevel.findFirst({
+                where: {
+                    address: {
+                        equals: address,
+                        mode: 'insensitive'
+                    }
+                },
+                include: {
+                    fireLevel: true
+                }
+            });
+            if (exactAddressMatch) {
+                console.log(`[DEBUG] Найдено точное соответствие адреса "${address}" в базе данных с уровнем ${exactAddressMatch.fireLevel.level}`);
+                return exactAddressMatch.fireLevel.level;
+            }
+            const partialAddressMatch = await this.prisma.fireAddressLevel.findFirst({
                 where: {
                     address: {
                         contains: address,
@@ -524,8 +538,32 @@ let FireService = class FireService {
                     fireLevel: true
                 }
             });
-            if (addressLevel) {
-                return addressLevel.fireLevel.level;
+            if (partialAddressMatch) {
+                console.log(`[DEBUG] Найдено частичное соответствие адреса "${address}" в базе данных с уровнем ${partialAddressMatch.fireLevel.level}`);
+                return partialAddressMatch.fireLevel.level;
+            }
+        }
+        const addressesWithCoordinates = await this.prisma.fireAddressLevel.findMany({
+            where: {
+                latitude: { not: null },
+                longitude: { not: null }
+            },
+            include: {
+                fireLevel: true
+            }
+        });
+        if (addressesWithCoordinates.length > 0) {
+            const addressesWithDistance = addressesWithCoordinates
+                .filter(addr => addr.latitude && addr.longitude)
+                .map(addr => ({
+                ...addr,
+                distance: this.calculateDistance(latitude, longitude, addr.latitude, addr.longitude)
+            }))
+                .sort((a, b) => a.distance - b.distance);
+            const nearbyAddress = addressesWithDistance[0];
+            if (nearbyAddress && nearbyAddress.distance < 0.5) {
+                console.log(`[DEBUG] Найден ближайший адрес с координатами на расстоянии ${nearbyAddress.distance.toFixed(3)} км с уровнем ${nearbyAddress.fireLevel.level}`);
+                return nearbyAddress.fireLevel.level;
             }
         }
         const lowestLevel = await this.prisma.fireLevel.findFirst({
@@ -533,7 +571,18 @@ let FireService = class FireService {
                 level: 'asc'
             }
         });
+        console.log(`[DEBUG] Не найдено совпадений по адресу или координатам, используется минимальный уровень ${lowestLevel?.level || 1}`);
         return lowestLevel ? lowestLevel.level : 1;
+    }
+    calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = this.deg2rad(lat2 - lat1);
+        const dLon = this.deg2rad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
     }
     async getFireHistory(fireId) {
         const fire = await this.prisma.fireIncident.findUnique({
@@ -705,6 +754,8 @@ let FireService = class FireService {
             data: {
                 address: data.address,
                 description: data.description,
+                latitude: data.latitude,
+                longitude: data.longitude,
                 fireLevel: {
                     connect: { id: data.fireLevelId }
                 }

@@ -3,6 +3,7 @@ import { FireService } from './fire.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { CreateFireLevelDto } from './dto/create-firelevel.dto';
 
 @Controller('fire-level')
 export class FireLevelController {
@@ -23,5 +24,26 @@ export class FireLevelController {
     const level = await this.fireService.getLevelById(numId);
     if (!level) throw new NotFoundException(`Уровень с id ${id} не найден`);
     return level;
+  }
+  
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post()
+  createLevel(@Body() dto: CreateFireLevelDto) {
+    return this.fireService.createLevel(dto);
+  }
+  
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Put(':id')
+  updateLevel(@Param('id') id: string, @Body() dto: CreateFireLevelDto) {
+    return this.fireService.updateLevel(Number(id), dto);
+  }
+  
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete(':id')
+  deleteLevel(@Param('id') id: string) {
+    return this.fireService.deleteLevel(Number(id));
   }
 } 

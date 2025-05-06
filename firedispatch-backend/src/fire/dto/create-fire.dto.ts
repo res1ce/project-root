@@ -1,4 +1,4 @@
-import { IsArray, ArrayMinSize, ArrayMaxSize, IsNumber, IsInt, IsString, IsOptional, IsEnum } from 'class-validator';
+import { IsArray, ArrayMinSize, ArrayMaxSize, IsNumber, IsInt, IsString, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { IncidentStatus } from '@prisma/client';
 
 export class CreateFireDto {
@@ -24,8 +24,9 @@ export class CreateFireDto {
   @IsString()
   address?: string;
 
+  @IsOptional()
   @IsInt()
-  reportedById: number;
+  reportedById?: number;
 
   @IsOptional()
   @IsInt()
@@ -34,4 +35,8 @@ export class CreateFireDto {
   @IsOptional()
   @IsInt()
   assignedStationId?: number;
+  
+  @IsOptional()
+  @IsBoolean()
+  autoLevel?: boolean;
 } 

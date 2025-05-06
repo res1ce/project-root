@@ -30,6 +30,7 @@ export interface FireStation {
 export interface FireEngineType {
   id: number;
   name: string;
+  description?: string;
 }
 
 // Пожарная машина
@@ -40,11 +41,13 @@ export interface FireEngine {
   type?: FireEngineType;
   stationId: number;
   isAvailable: boolean;
+  typeName?: string;
 }
 
 // Уровень пожара
 export interface FireLevel {
   id: number;
+  level?: number;
   name: string;
   description?: string;
 }

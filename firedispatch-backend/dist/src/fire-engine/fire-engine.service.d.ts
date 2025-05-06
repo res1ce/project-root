@@ -20,6 +20,7 @@ export declare class FireEngineService {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         };
     } & {
@@ -39,6 +40,7 @@ export declare class FireEngineService {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         };
     } & {
@@ -58,6 +60,7 @@ export declare class FireEngineService {
             address: string;
             latitude: number;
             longitude: number;
+            phoneNumber: string | null;
             createdAt: Date;
         };
     } & {
