@@ -11,7 +11,11 @@ import * as jwt from 'jsonwebtoken';
   cors: {
     origin: ['http://localhost:3001', 'http://localhost:3000'],
     credentials: true
-  } 
+  },
+  path: '/fire-events/socket.io',
+  namespace: '/fire-events',
+  transports: ['websocket'],
+  connectTimeout: 60000,
 })
 export class FireEventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

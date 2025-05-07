@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '@/store/auth-store';
 import { useFireStore } from '@/store/fire-store';
 import { Fire } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
+import { useWebSocket } from './use-websocket';
+import { useFireEventsSocket } from './use-fire-events-socket';
 
 interface FireEvent {
   fire: Fire;
@@ -18,19 +19,146 @@ interface FireAlert {
 }
 
 export function useEnhancedFireEvents() {
-  const { token, user } = useAuthStore();
+  const { user } = useAuthStore();
   const { fires, loadFires } = useFireStore();
-  const [connected, setConnected] = useState(false);
   const [alerts, setAlerts] = useState<FireAlert[]>([]);
-  const socketRef = useRef<Socket | null>(null);
   
-  // Close a specific alert
-  const closeAlert = (alertId: string) => {
-    setAlerts(current => current.filter(alert => alert.id !== alertId));
-  };
+  // Используем оба соединения
+  const { 
+    isConnected: isMainConnected, 
+    on: onMain, 
+    emit: emitMain 
+  } = useWebSocket(); // Основное WebSocket соединение
   
-  // Add a new alert
-  const addAlert = (fire: Fire, playSound: boolean = false) => {
+  const {
+    isConnected: isFireEventsConnected,
+    on: onFireEvents
+  } = useFireEventsSocket(); // Соединение для пожарных событий
+  
+  // Объединенное состояние подключения
+  const isConnected = isMainConnected || isFireEventsConnected;
+  
+  const isMounted = useRef(true);
+
+  // Безопасный способ обновления состояния
+  const safeSetAlerts = useCallback((updater: React.SetStateAction<FireAlert[]>) => {
+    if (isMounted.current) {
+      setAlerts(updater);
+    }
+  }, []);
+
+  // При монтировании и размонтировании компонента
+  useEffect(() => {
+    isMounted.current = true;
+    console.log('Enhanced FireEvents mounted');
+    
+    return () => {
+      isMounted.current = false;
+      console.log('Enhanced FireEvents unmounted');
+    };
+  }, []);
+
+  // Регистрация на основные серверные события через основное соединение
+  useEffect(() => {
+    if (!isMainConnected) return;
+    
+    console.log('Registering main system event handlers');
+    
+    // Аутентифицируем пользователя если необходимо
+    if (user) {
+      // Подключаемся к комнате пожарной части
+      if (user.role === 'station_dispatcher' && user.fireStationId) {
+        emitMain('join_station', user.fireStationId);
+      }
+    }
+    
+    // Обработчики для системных событий через основное соединение
+    const unsubscribeFireStatusUpdate = onMain('fire_status_update', (data: any) => {
+      console.log('Fire status update:', data);
+      loadFires();
+      
+      if (data.fireIncidentId) {
+        const fireId = parseInt(data.fireIncidentId);
+        const foundFire = fires.find(f => f.id === fireId);
+        if (foundFire) {
+          addAlert({
+            ...foundFire,
+            status: data.status
+          }, true);
+        }
+      }
+    });
+
+    const unsubscribeNewFireIncident = onMain('new_fire_incident', (data: any) => {
+      console.log('New fire incident:', data);
+      loadFires();
+      
+      if (data.fireIncident) {
+        addAlert(data.fireIncident, true);
+      }
+    });
+    
+    const unsubscribeNotification = onMain('notification', (data: any) => {
+      console.log('Notification received:', data);
+      
+      // Обновляем данные, если это связано с пожарами
+      if (data.type === 'fire_status_update' || data.type === 'new_fire' || data.type === 'assignment') {
+        loadFires();
+      }
+    });
+    
+    // Отписываемся от событий при размонтировании компонента
+    return () => {
+      unsubscribeFireStatusUpdate();
+      unsubscribeNewFireIncident();
+      unsubscribeNotification();
+    };
+  }, [isMainConnected, user, fires, loadFires, onMain, emitMain]);
+  
+  // Регистрация на события пожаров через специализированное соединение
+  useEffect(() => {
+    if (!isFireEventsConnected) return;
+    
+    console.log('Registering fire events socket handlers');
+    
+    // Обработчики событий
+    const unsubscribeFireCreated = onFireEvents('fireCreated', (data: FireEvent) => {
+      console.log('New fire created (fire-events):', data);
+      loadFires();
+      
+      // Add alert for central dispatcher
+      if (user?.role === 'central_dispatcher') {
+        addAlert(data.fire, true);
+      }
+    });
+
+    const unsubscribeFireUpdated = onFireEvents('fireUpdated', (data: Fire) => {
+      console.log('Fire updated (fire-events):', data);
+      loadFires();
+    });
+
+    const unsubscribeFireAssigned = onFireEvents('fireAssigned', (data: FireEvent) => {
+      console.log('Fire assigned (fire-events):', data);
+      loadFires();
+      
+      // Add alert for station dispatcher
+      if (user?.role === 'station_dispatcher' && user.fireStationId === data.fire.assignedStationId) {
+        addAlert(data.fire, true);
+      }
+    });
+    
+    // Отписываемся от событий при размонтировании компонента
+    return () => {
+      unsubscribeFireCreated();
+      unsubscribeFireUpdated();
+      unsubscribeFireAssigned();
+    };
+  }, [isFireEventsConnected, user, loadFires, onFireEvents]);
+  
+  // Функция добавления уведомления о пожаре
+  const addAlert = useCallback((fire: Fire, playSound: boolean = false) => {
+    if (!isMounted.current) return;
+    
     const newAlert: FireAlert = {
       id: uuidv4(),
       fire,
@@ -38,75 +166,29 @@ export function useEnhancedFireEvents() {
       timestamp: Date.now()
     };
     
-    setAlerts(current => [...current, newAlert]);
+    safeSetAlerts(prevAlerts => [...prevAlerts, newAlert]);
     
-    // Auto-close alert after 15 seconds
-    setTimeout(() => {
-      closeAlert(newAlert.id);
-    }, 15000);
-  };
-
-  useEffect(() => {
-    if (!token) return;
-
-    // Создаем WebSocket соединение
-    const socketUrl = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3000';
-    const socket = io(socketUrl, {
-      query: { token },
-      transports: ['websocket'],
-    });
-
-    // Обработчики событий
-    socket.on('connect', () => {
-      console.log('WebSocket connected');
-      setConnected(true);
-    });
-
-    socket.on('disconnect', () => {
-      console.log('WebSocket disconnected');
-      setConnected(false);
-    });
-
-    // Обработка нового пожара
-    socket.on('fireCreated', (data: FireEvent) => {
-      console.log('New fire created:', data);
-      loadFires(); // Перезагружаем список пожаров
-      
-      // Add alert for new fire with sound for central dispatcher
-      if (user?.role === 'central_dispatcher') {
-        addAlert(data.fire, true);
+    // Проигрывание звука, если нужно
+    if (playSound) {
+      try {
+        const audio = new Audio('/sounds/alert.mp3');
+        audio.play();
+      } catch (error) {
+        console.error('Failed to play alert sound:', error);
       }
-    });
+    }
+  }, [safeSetAlerts]);
+  
+  // Функция закрытия уведомления
+  const closeAlert = useCallback((alertId: string) => {
+    if (!isMounted.current) return;
+    safeSetAlerts(prevAlerts => prevAlerts.filter(alert => alert.id !== alertId));
+  }, [safeSetAlerts]);
 
-    // Обработка обновления пожара
-    socket.on('fireUpdated', (data: Fire) => {
-      console.log('Fire updated:', data);
-      loadFires(); // Перезагружаем список пожаров
-    });
-
-    // Обработка назначения пожара
-    socket.on('fireAssigned', (data: FireEvent) => {
-      console.log('Fire assigned:', data);
-      loadFires(); // Перезагружаем список пожаров
-      
-      // Add alert for assigned fire with sound for station dispatcher
-      if (user?.role === 'station_dispatcher' && user.fireStationId === data.fire.assignedStationId) {
-        addAlert(data.fire, true);
-      }
-    });
-
-    socketRef.current = socket;
-
-    // Очистка при размонтировании
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [token, loadFires, user]);
-
-  return { 
-    connected,
+  return {
+    connected: isConnected, // Используем комбинированное состояние подключения
     alerts,
-    closeAlert
+    closeAlert,
+    addAlert
   };
 } 

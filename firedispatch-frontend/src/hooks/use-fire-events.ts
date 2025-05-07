@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useFireStore } from '@/store/fire-store';
 import { Fire } from '@/types';
 import { toast } from '@/components/ui/toast';
-import { useWebSocket } from './use-websocket';
+import { useFireEventsSocket } from './use-fire-events-socket';
 
 interface FireEvent {
   fire: Fire;
@@ -11,7 +11,8 @@ interface FireEvent {
 
 export function useFireEvents() {
   const { loadFires } = useFireStore();
-  const { isConnected, on } = useWebSocket();
+  // Используем отдельное соединение для fire events
+  const { isConnected, on } = useFireEventsSocket();
   
   // Функция для воспроизведения звукового уведомления
   const playAlertSound = () => {
@@ -24,7 +25,12 @@ export function useFireEvents() {
   };
 
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isConnected) {
+      console.log('Fire Events WebSocket not connected, skipping event subscriptions');
+      return;
+    }
+
+    console.log('Setting up Fire Events WebSocket subscriptions');
 
     // Обработка нового пожара
     const offFireCreated = on('fireCreated', (data: FireEvent) => {
@@ -58,58 +64,22 @@ export function useFireEvents() {
       }
     });
 
-    // Подписываемся на новые события из бэкенда
-    const offFireStatusUpdate = on('fire_status_update', (data: any) => {
-      console.log('Fire status update:', data);
-      loadFires(); // Перезагружаем список пожаров
-      
+    // Подписываемся на создание отчетов
+    const offReportCreated = on('reportCreated', (data: any) => {
+      console.log('Report created:', data);
       toast({ 
-        title: `Статус пожара #${data.fireIncidentId} изменен на ${data.status}`,
+        title: `Создан новый отчет`,
         variant: 'default'
       });
-    });
-
-    const offNewFireIncident = on('new_fire_incident', (data: any) => {
-      console.log('New fire incident:', data);
-      loadFires(); // Перезагружаем список пожаров
-      
-      playAlertSound();
-      toast({ 
-        title: data.message || 'Новый пожар требует вашего внимания!',
-        variant: 'destructive'
-      });
-    });
-
-    // Подписываемся на общие уведомления
-    const offNotification = on('notification', (data: any) => {
-      console.log('Notification received:', data);
-      
-      const { type, message } = data;
-      
-      // Проигрываем звук для важных уведомлений
-      if (type === 'fire_status_update' || type === 'new_fire' || type === 'assignment') {
-        playAlertSound();
-      }
-      
-      toast({ 
-        title: message,
-        variant: 'default'
-      });
-      
-      // Обновляем данные, если это связано с пожарами
-      if (type === 'fire_status_update' || type === 'new_fire' || type === 'assignment') {
-        loadFires();
-      }
     });
 
     // Очистка подписок при размонтировании
     return () => {
+      console.log('Cleaning up Fire Events WebSocket subscriptions');
       offFireCreated();
       offFireUpdated();
       offFireAssigned();
-      offFireStatusUpdate();
-      offNewFireIncident();
-      offNotification();
+      offReportCreated();
     };
   }, [isConnected, on, loadFires]);
 
