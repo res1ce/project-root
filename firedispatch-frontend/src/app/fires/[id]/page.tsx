@@ -79,6 +79,7 @@ interface Fire {
   dispatchedEngines?: DispatchedEngine[];
   // Другие поля для совместимости
   readableStatus?: string;
+  resolvedAt?: string;
 }
 
 interface DispatchedEngine {
@@ -464,7 +465,22 @@ export default function FireDetailsPage() {
   // Права на отметку пожара как потушенного
   const canResolveFire = 
     (user?.role === 'central_dispatcher') || 
-    (user?.role === 'station_dispatcher' && user.fireStationId === fire?.assignedStationId);
+    (user?.role === 'station_dispatcher' && (
+      user.fireStationId === fire?.assignedStationId || 
+      user.fireStationId === fire?.fireStation?.id
+    ));
+  
+  // Отладочный вывод для проверки прав
+  useEffect(() => {
+    if (fire) {
+      console.log('[DEBUG] Проверка прав на отметку пожара как потушенный:');
+      console.log('[DEBUG] Роль пользователя:', user?.role);
+      console.log('[DEBUG] ID станции пользователя:', user?.fireStationId);
+      console.log('[DEBUG] ID станции пожара (assignedStationId):', fire.assignedStationId);
+      console.log('[DEBUG] ID станции пожара (fireStation.id):', fire.fireStation?.id);
+      console.log('[DEBUG] Имеет права на отметку потушенного:', canResolveFire);
+    }
+  }, [fire, user, canResolveFire]);
   
   // Перевод статуса пожара на русский
   const getFireStatusText = (status: string): string => {
@@ -591,6 +607,12 @@ export default function FireDetailsPage() {
                     <p className="text-sm text-gray-500">Последнее обновление</p>
                     <p className="font-medium">{formatDate(fire.updatedAt)}</p>
                   </div>
+                  {fire.status === 'RESOLVED' && fire.resolvedAt && (
+                    <div>
+                      <p className="text-sm text-gray-500">Дата потушения</p>
+                      <p className="font-medium">{formatDate(fire.resolvedAt)}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm text-gray-500">Назначенная часть</p>
                     <p className="font-medium">{getFireStationName(fire)}</p>

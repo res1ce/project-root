@@ -28,12 +28,13 @@ interface ExtendedFire extends Fire {
     name: string;
   };
   readableStatus?: string;
+  resolvedAt?: string;
 }
 
 export default function FiresListPage() {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuthStore();
-  const { fires, isLoading, loadFires } = useFireStore();
+  const { fires, isLoading, loadFires, showResolved, toggleShowResolved } = useFireStore();
 
   useEffect(() => {
     const fetchFires = async () => {
@@ -83,16 +84,35 @@ export default function FiresListPage() {
     }
   };
 
+  // Обработчик для переключения отображения потушенных пожаров
+  const handleToggleShowResolved = () => {
+    toggleShowResolved();
+  };
+
   return (
     <AppLayout>
       <div>
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Список пожаров</h1>
-          {user?.role === 'central_dispatcher' && (
-            <Link href="/fires/map" className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm">
-              Отметить новый пожар
-            </Link>
-          )}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="showResolved"
+                checked={showResolved}
+                onChange={handleToggleShowResolved}
+                className="w-4 h-4 mr-2 text-red-600 border-gray-300 rounded focus:ring-red-500"
+              />
+              <label htmlFor="showResolved" className="text-sm text-gray-600">
+                Показывать потушенные
+              </label>
+            </div>
+            {user?.role === 'central_dispatcher' && (
+              <Link href="/fires/map" className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm">
+                Отметить новый пожар
+              </Link>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -121,6 +141,11 @@ export default function FiresListPage() {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Время создания
                     </th>
+                    {showResolved && (
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Время разрешения
+                      </th>
+                    )}
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Назначенная часть
                     </th>
@@ -151,6 +176,11 @@ export default function FiresListPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(extendedFire.createdAt)}
                         </td>
+                        {showResolved && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {extendedFire.resolvedAt ? formatDate(extendedFire.resolvedAt) : '-'}
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {extendedFire.fireStation ? 
                             extendedFire.fireStation.name : 
@@ -167,7 +197,8 @@ export default function FiresListPage() {
                             Детали
                           </Link>
                           {(user?.role === 'central_dispatcher' || user?.role === 'station_dispatcher') && 
-                            extendedFire.status.toLowerCase() !== 'resolved' && (
+                            extendedFire.status.toLowerCase() !== 'resolved' && 
+                            extendedFire.status.toLowerCase() !== 'cancelled' && (
                             <Link 
                               href={`/fires/${extendedFire.id}/edit`}
                               className="text-green-600 hover:text-green-900"

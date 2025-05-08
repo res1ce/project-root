@@ -63,7 +63,7 @@ export interface FireLevelEngineRequirement {
 }
 
 // Статус пожара
-export type FireStatus = 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED' | 'PENDING' | 'active' | 'investigating' | 'dispatched' | 'resolved';
+export type FireStatus = 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED';
 
 // Пожар
 export interface Fire {
@@ -77,6 +77,7 @@ export interface Fire {
   status: FireStatus;
   createdAt: string;
   updatedAt: string;
+  resolvedAt?: string;
   assignedStationId: number | null;
   assignedStation?: FireStation;
   
