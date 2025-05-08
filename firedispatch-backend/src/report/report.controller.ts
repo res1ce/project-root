@@ -96,6 +96,32 @@ export class ReportController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('fire-incident/:fireIncidentId/excel')
+  async getFireIncidentExcel(
+    @Param('fireIncidentId') fireIncidentId: string,
+    @Res() res: Response
+  ) {
+    try {
+      const excelPath = await this.reportService.generateFireIncidentExcel(Number(fireIncidentId));
+      
+      // Отправляем файл
+      const filename = excelPath.split('/').pop();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      
+      const fileStream = fs.createReadStream(excelPath);
+      fileStream.pipe(res);
+      
+      // Удаляем файл после отправки
+      fileStream.on('end', () => {
+        fs.unlinkSync(excelPath);
+      });
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('statistics/pdf')
   async getStatisticsPdf(
     @Query('startDate') startDateStr: string,
@@ -104,6 +130,8 @@ export class ReportController {
     @Res() res: Response
   ) {
     try {
+      console.log('Generating PDF report with params:', { startDateStr, endDateStr, stationIdStr });
+      
       const startDate = new Date(startDateStr);
       const endDate = new Date(endDateStr);
       const stationId = stationIdStr ? Number(stationIdStr) : undefined;
@@ -112,9 +140,21 @@ export class ReportController {
         throw new BadRequestException('Invalid date format');
       }
       
+      console.log('Parsed dates:', { startDate, endDate, stationId });
+      
+      // Расширим диапазон дат для отладки, чтобы увидеть больше пожаров
+      const adjustedStartDate = new Date(startDate);
+      const adjustedEndDate = new Date(endDate);
+      
+      // Установим время на начало и конец дня
+      adjustedStartDate.setHours(0, 0, 0, 0);
+      adjustedEndDate.setHours(23, 59, 59, 999);
+      
+      console.log('Adjusted dates for full day coverage:', { adjustedStartDate, adjustedEndDate });
+      
       const pdfPath = await this.reportService.generateStatisticsReport(
-        startDate,
-        endDate,
+        adjustedStartDate,
+        adjustedEndDate,
         stationId
       );
       
@@ -131,6 +171,62 @@ export class ReportController {
         fs.unlinkSync(pdfPath);
       });
     } catch (error) {
+      console.error('Error generating PDF report:', error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('statistics/excel')
+  async getStatisticsExcel(
+    @Query('startDate') startDateStr: string,
+    @Query('endDate') endDateStr: string,
+    @Query('stationId') stationIdStr: string,
+    @Res() res: Response
+  ) {
+    try {
+      console.log('Generating Excel report with params:', { startDateStr, endDateStr, stationIdStr });
+      
+      const startDate = new Date(startDateStr);
+      const endDate = new Date(endDateStr);
+      const stationId = stationIdStr ? Number(stationIdStr) : undefined;
+      
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        throw new BadRequestException('Invalid date format');
+      }
+      
+      console.log('Parsed dates:', { startDate, endDate, stationId });
+      
+      // Расширим диапазон дат для отладки, чтобы увидеть больше пожаров
+      const adjustedStartDate = new Date(startDate);
+      const adjustedEndDate = new Date(endDate);
+      
+      // Установим время на начало и конец дня
+      adjustedStartDate.setHours(0, 0, 0, 0);
+      adjustedEndDate.setHours(23, 59, 59, 999);
+      
+      console.log('Adjusted dates for full day coverage:', { adjustedStartDate, adjustedEndDate });
+      
+      const excelPath = await this.reportService.generateStatisticsExcel(
+        adjustedStartDate,
+        adjustedEndDate,
+        stationId
+      );
+      
+      // Отправляем файл
+      const filename = excelPath.split('/').pop();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      
+      const fileStream = fs.createReadStream(excelPath);
+      fileStream.pipe(res);
+      
+      // Удаляем файл после отправки
+      fileStream.on('end', () => {
+        fs.unlinkSync(excelPath);
+      });
+    } catch (error) {
+      console.error('Error generating Excel report:', error);
       throw new BadRequestException(error.message);
     }
   }

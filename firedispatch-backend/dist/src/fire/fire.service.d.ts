@@ -102,8 +102,8 @@ export declare class FireService {
             updatedAt: Date;
             createdAt: Date;
             fireIncidentId: number;
-            userId: number;
             content: string;
+            userId: number;
         }[];
         reportedBy: {
             id: number;
@@ -172,8 +172,8 @@ export declare class FireService {
             updatedAt: Date;
             createdAt: Date;
             fireIncidentId: number;
-            userId: number;
             content: string;
+            userId: number;
         }[];
         reportedBy: {
             id: number;

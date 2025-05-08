@@ -6,22 +6,47 @@ import { useAuthStore } from '@/store/auth-store';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
 import { DatePickerInput } from '@mantine/dates';
+import { Select } from '@mantine/core';
+import { useFireStationStore } from '@/store/fire-station-store';
+
+interface FireStation {
+  id: number;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+}
 
 interface Report {
+  id: number;
+  content: string;
+  createdAt: string;
+  userId: number;
+  fireIncidentId: number;
+  user?: {
+    name: string;
+    role: string;
+  };
+}
+
+interface GeneratedReport {
   id: number;
   title: string;
   type: string;
   createdAt: string;
   startDate?: string;
   endDate?: string;
+  stationId?: number;
   userId: number;
-  fileUrl?: string;
-  parameters?: Record<string, any>;
 }
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export default function ReportsPage() {
   const { user } = useAuthStore();
+  const { stations, fetchStations } = useFireStationStore();
   const [reports, setReports] = useState<Report[]>([]);
+  const [generatedReports, setGeneratedReports] = useState<GeneratedReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -29,106 +54,139 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState<string>('');
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   
   useEffect(() => {
-    const fetchReports = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         
-        // В реальном приложении здесь был бы запрос к API
-        // const response = await api.get('/report');
-        
-        // Демонстрационные данные
-        const mockReports: Report[] = [
-          {
-            id: 1,
-            title: 'Отчет по активным пожарам',
-            type: 'active_fires',
-            createdAt: '2025-04-28T10:30:00Z',
-            userId: user?.id || 1,
-            fileUrl: '#'
-          },
-          {
-            id: 2,
-            title: 'Статистика пожаров за апрель 2025',
-            type: 'monthly_statistics',
-            createdAt: '2025-04-25T15:20:00Z',
-            startDate: '2025-04-01',
-            endDate: '2025-04-30',
-            userId: user?.id || 1,
-            fileUrl: '#'
-          },
-          {
-            id: 3,
-            title: 'Отчет по работе пожарных частей',
-            type: 'stations_performance',
-            createdAt: '2025-04-20T09:15:00Z',
-            startDate: '2025-03-01',
-            endDate: '2025-03-31',
-            userId: user?.id || 1,
-            fileUrl: '#'
+        try {
+          // Получаем список пожарных частей, если они еще не загружены
+          if (stations.length === 0) {
+            await fetchStations();
           }
-        ];
+        } catch (error) {
+          console.error('Error fetching stations:', error);
+          // Продолжаем выполнение, даже если не удалось загрузить станции
+        }
         
-        setReports(mockReports);
+        try {
+          // Загружаем отчеты
+          const response = await api.get('/api/report');
+          setReports(response.data || []);
+        } catch (error) {
+          console.error('Error fetching reports:', error);
+          // Продолжаем выполнение, даже если не удалось загрузить отчеты
+        }
+        
+        // Загружаем историю сгенерированных отчетов
+        // В реальном приложении здесь должен быть API для получения истории сгенерированных отчетов
+        // Пока используем localStorage
+        try {
+          const savedReports = localStorage.getItem('generatedReports');
+          if (savedReports) {
+            setGeneratedReports(JSON.parse(savedReports));
+          }
+        } catch (error) {
+          console.error('Error parsing saved reports:', error);
+          setGeneratedReports([]);
+        }
       } catch (error) {
-        console.error('Error fetching reports:', error);
-        toast.error('Ошибка при загрузке отчетов');
+        console.error('Error in fetchData:', error);
+        toast.error('Ошибка при загрузке данных');
       } finally {
         setLoading(false);
       }
     };
     
-    fetchReports();
-  }, [user?.id]);
+    fetchData();
+  }, [user?.id, stations.length, fetchStations]);
   
   const handleGenerateReport = async (type: string) => {
-    if (!startDate && (type === 'monthly_statistics' || type === 'stations_performance')) {
-      toast.error('Выберите начальную дату для отчета');
-      return;
-    }
-    
-    if (!endDate && (type === 'monthly_statistics' || type === 'stations_performance')) {
-      toast.error('Выберите конечную дату для отчета');
+    if ((type === 'monthly_statistics' || type === 'stations_performance') && (!startDate || !endDate)) {
+      toast.error('Выберите начальную и конечную даты для отчета');
       return;
     }
     
     try {
       setIsGenerating(true);
       
-      // В реальном приложении здесь был бы запрос к API
-      // const response = await api.post('/report', {
-      //   type,
-      //   startDate: startDate?.toISOString().split('T')[0],
-      //   endDate: endDate?.toISOString().split('T')[0]
-      // });
+      let fileName = '';
+      let title = '';
       
-      // Имитация генерации отчета
-      setTimeout(() => {
-        const titles: Record<string, string> = {
-          'active_fires': 'Отчет по активным пожарам',
-          'monthly_statistics': `Статистика пожаров за период ${startDate?.toLocaleDateString()} - ${endDate?.toLocaleDateString()}`,
-          'stations_performance': `Отчет по работе пожарных частей за период ${startDate?.toLocaleDateString()} - ${endDate?.toLocaleDateString()}`
-        };
+      if (type === 'active_fires') {
+        title = 'Отчет по активным пожарам';
         
-        const newReport: Report = {
-          id: Math.max(...reports.map(r => r.id), 0) + 1,
-          title: titles[type] || 'Новый отчет',
+        // Сохраняем информацию о сгенерированном отчете
+        const newReport: GeneratedReport = {
+          id: Date.now(),
+          title,
           type,
           createdAt: new Date().toISOString(),
-          startDate: startDate?.toISOString().split('T')[0],
-          endDate: endDate?.toISOString().split('T')[0],
-          userId: user?.id || 1,
-          fileUrl: '#'
+          userId: user?.id || 0
         };
         
-        setReports([newReport, ...reports]);
+        const updatedReports = [newReport, ...generatedReports];
+        setGeneratedReports(updatedReports);
+        try {
+          localStorage.setItem('generatedReports', JSON.stringify(updatedReports));
+        } catch (error) {
+          console.error('Error saving to localStorage:', error);
+        }
+        
         toast.success('Отчет успешно сгенерирован');
-        setIsGenerating(false);
-      }, 2000);
+      } else if (type === 'monthly_statistics' || type === 'stations_performance') {
+        const format = type === 'monthly_statistics' ? 'pdf' : 'excel';
+        const params: Record<string, string> = {
+          startDate: startDate!.toISOString(),
+          endDate: endDate!.toISOString()
+        };
+        
+        if (selectedStationId) {
+          params.stationId = selectedStationId;
+        }
+        
+        console.log('Sending report request with params:', params);
+        
+        const queryString = new URLSearchParams(params).toString();
+        // Используем локальный API роутер вместо прямого обращения к бэкенду
+        const url = `/api/report/statistics/${format}?${queryString}`;
+        
+        // Открываем ссылку для скачивания файла
+        window.open(url, '_blank');
+        
+        const periodText = `${startDate!.toLocaleDateString()} - ${endDate!.toLocaleDateString()}`;
+        title = type === 'monthly_statistics' 
+          ? `Статистика пожаров за период ${periodText}`
+          : `Отчет по работе пожарных частей за период ${periodText}`;
+        
+        // Сохраняем информацию о сгенерированном отчете
+        const newReport: GeneratedReport = {
+          id: Date.now(),
+          title,
+          type,
+          createdAt: new Date().toISOString(),
+          startDate: startDate!.toISOString(),
+          endDate: endDate!.toISOString(),
+          stationId: selectedStationId ? parseInt(selectedStationId, 10) : undefined,
+          userId: user?.id || 0
+        };
+        
+        const updatedReports = [newReport, ...generatedReports];
+        setGeneratedReports(updatedReports);
+        try {
+          localStorage.setItem('generatedReports', JSON.stringify(updatedReports));
+        } catch (error) {
+          console.error('Error saving to localStorage:', error);
+        }
+        
+        toast.success('Отчет успешно сгенерирован');
+      }
     } catch (error) {
       console.error('Error generating report:', error);
       toast.error('Ошибка при генерации отчета');
+    } finally {
       setIsGenerating(false);
     }
   };
@@ -156,7 +214,50 @@ export default function ReportsPage() {
     });
   };
   
-  const filteredReports = reports.filter(report => {
+  const handleDownloadReport = (report: GeneratedReport, format: 'pdf' | 'excel') => {
+    try {
+      let url = '';
+      
+      if (report.type === 'active_fires') {
+        // Для активных пожаров просто уведомление
+        toast.info('Отчет по активным пожарам будет доступен в ближайшее время');
+        return;
+      } else if (report.type === 'monthly_statistics' || report.type === 'stations_performance') {
+        const params: Record<string, string> = {
+          startDate: report.startDate!,
+          endDate: report.endDate!
+        };
+        
+        if (report.stationId) {
+          params.stationId = String(report.stationId);
+        }
+        
+        console.log('Downloading report with params:', params);
+        
+        const queryString = new URLSearchParams(params).toString();
+        url = `/api/report/statistics/${format}?${queryString}`;
+        
+        // Открываем ссылку для скачивания файла
+        window.open(url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      toast.error('Ошибка при скачивании отчета');
+    }
+  };
+  
+  const handleDeleteReport = (reportId: number) => {
+    const updatedReports = generatedReports.filter(r => r.id !== reportId);
+    setGeneratedReports(updatedReports);
+    try {
+      localStorage.setItem('generatedReports', JSON.stringify(updatedReports));
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+    }
+    toast.success('Отчет удален из истории');
+  };
+  
+  const filteredReports = generatedReports.filter(report => {
     if (reportType && report.type !== reportType) {
       return false;
     }
@@ -186,21 +287,7 @@ export default function ReportsPage() {
         <div className="bg-white p-6 shadow-md rounded-lg">
           <h2 className="text-lg font-semibold mb-4">Создать новый отчет</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-4">
-              <h3 className="font-medium text-gray-800">Активные пожары</h3>
-              <p className="text-sm text-gray-600">
-                Генерирует отчет по текущим активным пожарам.
-              </p>
-              <button 
-                onClick={() => handleGenerateReport('active_fires')}
-                disabled={isGenerating}
-                className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
-              >
-                {isGenerating ? 'Генерация...' : 'Создать отчет'}
-              </button>
-            </div>
-            
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h3 className="font-medium text-gray-800">Статистика за период</h3>
               <p className="text-sm text-gray-600">
@@ -219,42 +306,49 @@ export default function ReportsPage() {
                   placeholder="Конечная дата"
                   className="w-full"
                 />
+                <Select
+                  data={[
+                    { value: '', label: 'Все пожарные части' },
+                    ...stations.map((station: any) => ({ 
+                      value: String(station.id), 
+                      label: station.name 
+                    }))
+                  ]}
+                  value={selectedStationId}
+                  onChange={setSelectedStationId}
+                  placeholder="Выберите пожарную часть"
+                  className="w-full col-span-2"
+                />
               </div>
-              <button 
-                onClick={() => handleGenerateReport('monthly_statistics')}
-                disabled={isGenerating}
-                className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
-              >
-                {isGenerating ? 'Генерация...' : 'Создать отчет'}
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={() => handleGenerateReport('monthly_statistics')}
+                  disabled={isGenerating}
+                  className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                >
+                  {isGenerating ? 'Генерация...' : 'PDF отчет'}
+                </button>
+                <button 
+                  onClick={() => handleGenerateReport('stations_performance')}
+                  disabled={isGenerating}
+                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                >
+                  {isGenerating ? 'Генерация...' : 'Excel отчет'}
+                </button>
+              </div>
             </div>
             
             <div className="space-y-4">
-              <h3 className="font-medium text-gray-800">Работа пожарных частей</h3>
+              <h3 className="font-medium text-gray-800">Информация</h3>
               <p className="text-sm text-gray-600">
-                Генерирует отчет по эффективности работы пожарных частей.
+                Вы можете генерировать отчеты в формате PDF и Excel. После генерации отчета вы можете скачать его по ссылке в таблице ниже.
               </p>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <DatePickerInput
-                  value={startDate}
-                  onChange={setStartDate}
-                  placeholder="Начальная дата"
-                  className="w-full"
-                />
-                <DatePickerInput
-                  value={endDate}
-                  onChange={setEndDate}
-                  placeholder="Конечная дата"
-                  className="w-full"
-                />
-              </div>
-              <button 
-                onClick={() => handleGenerateReport('stations_performance')}
-                disabled={isGenerating}
-                className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
-              >
-                {isGenerating ? 'Генерация...' : 'Создать отчет'}
-              </button>
+              <p className="text-sm text-gray-600">
+                Отчеты содержат информацию о пожарах, статистику и другие данные, которые могут быть полезны для анализа.
+              </p>
+              <p className="text-sm text-gray-600 font-medium">
+                PDF-отчеты содержат общую статистику, а Excel-отчеты дополнительно включают детальные таблицы с возможностью дальнейшей обработки данных.
+              </p>
             </div>
           </div>
         </div>
@@ -350,22 +444,25 @@ export default function ReportsPage() {
                             'Н/Д'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <a 
-                            href={report.fileUrl} 
-                            className="text-indigo-600 hover:text-indigo-900 mr-3"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              toast.info('Скачивание отчета будет доступно в полной версии');
-                            }}
-                          >
-                            Скачать
-                          </a>
+                          {report.type !== 'active_fires' && (
+                            <>
+                              <button 
+                                onClick={() => handleDownloadReport(report, 'pdf')}
+                                className="text-indigo-600 hover:text-indigo-900 mr-2"
+                              >
+                                PDF
+                              </button>
+                              <button 
+                                onClick={() => handleDownloadReport(report, 'excel')}
+                                className="text-green-600 hover:text-green-900 mr-3"
+                              >
+                                Excel
+                              </button>
+                            </>
+                          )}
                           <button 
                             className="text-red-600 hover:text-red-900"
-                            onClick={() => {
-                              setReports(reports.filter(r => r.id !== report.id));
-                              toast.success('Отчет удален');
-                            }}
+                            onClick={() => handleDeleteReport(report.id)}
                           >
                             Удалить
                           </button>

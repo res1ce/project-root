@@ -70,15 +70,38 @@ let ReportController = class ReportController {
             throw new common_1.BadRequestException(error.message);
         }
     }
+    async getFireIncidentExcel(fireIncidentId, res) {
+        try {
+            const excelPath = await this.reportService.generateFireIncidentExcel(Number(fireIncidentId));
+            const filename = excelPath.split('/').pop();
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+            const fileStream = fs.createReadStream(excelPath);
+            fileStream.pipe(res);
+            fileStream.on('end', () => {
+                fs.unlinkSync(excelPath);
+            });
+        }
+        catch (error) {
+            throw new common_1.BadRequestException(error.message);
+        }
+    }
     async getStatisticsPdf(startDateStr, endDateStr, stationIdStr, res) {
         try {
+            console.log('Generating PDF report with params:', { startDateStr, endDateStr, stationIdStr });
             const startDate = new Date(startDateStr);
             const endDate = new Date(endDateStr);
             const stationId = stationIdStr ? Number(stationIdStr) : undefined;
             if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
                 throw new common_1.BadRequestException('Invalid date format');
             }
-            const pdfPath = await this.reportService.generateStatisticsReport(startDate, endDate, stationId);
+            console.log('Parsed dates:', { startDate, endDate, stationId });
+            const adjustedStartDate = new Date(startDate);
+            const adjustedEndDate = new Date(endDate);
+            adjustedStartDate.setHours(0, 0, 0, 0);
+            adjustedEndDate.setHours(23, 59, 59, 999);
+            console.log('Adjusted dates for full day coverage:', { adjustedStartDate, adjustedEndDate });
+            const pdfPath = await this.reportService.generateStatisticsReport(adjustedStartDate, adjustedEndDate, stationId);
             const filename = pdfPath.split('/').pop();
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
@@ -89,6 +112,37 @@ let ReportController = class ReportController {
             });
         }
         catch (error) {
+            console.error('Error generating PDF report:', error);
+            throw new common_1.BadRequestException(error.message);
+        }
+    }
+    async getStatisticsExcel(startDateStr, endDateStr, stationIdStr, res) {
+        try {
+            console.log('Generating Excel report with params:', { startDateStr, endDateStr, stationIdStr });
+            const startDate = new Date(startDateStr);
+            const endDate = new Date(endDateStr);
+            const stationId = stationIdStr ? Number(stationIdStr) : undefined;
+            if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                throw new common_1.BadRequestException('Invalid date format');
+            }
+            console.log('Parsed dates:', { startDate, endDate, stationId });
+            const adjustedStartDate = new Date(startDate);
+            const adjustedEndDate = new Date(endDate);
+            adjustedStartDate.setHours(0, 0, 0, 0);
+            adjustedEndDate.setHours(23, 59, 59, 999);
+            console.log('Adjusted dates for full day coverage:', { adjustedStartDate, adjustedEndDate });
+            const excelPath = await this.reportService.generateStatisticsExcel(adjustedStartDate, adjustedEndDate, stationId);
+            const filename = excelPath.split('/').pop();
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+            const fileStream = fs.createReadStream(excelPath);
+            fileStream.pipe(res);
+            fileStream.on('end', () => {
+                fs.unlinkSync(excelPath);
+            });
+        }
+        catch (error) {
+            console.error('Error generating Excel report:', error);
             throw new common_1.BadRequestException(error.message);
         }
     }
@@ -157,6 +211,15 @@ __decorate([
 ], ReportController.prototype, "getFireIncidentPdf", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)('fire-incident/:fireIncidentId/excel'),
+    __param(0, (0, common_1.Param)('fireIncidentId')),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], ReportController.prototype, "getFireIncidentExcel", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)('statistics/pdf'),
     __param(0, (0, common_1.Query)('startDate')),
     __param(1, (0, common_1.Query)('endDate')),
@@ -166,6 +229,17 @@ __decorate([
     __metadata("design:paramtypes", [String, String, String, Object]),
     __metadata("design:returntype", Promise)
 ], ReportController.prototype, "getStatisticsPdf", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)('statistics/excel'),
+    __param(0, (0, common_1.Query)('startDate')),
+    __param(1, (0, common_1.Query)('endDate')),
+    __param(2, (0, common_1.Query)('stationId')),
+    __param(3, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, Object]),
+    __metadata("design:returntype", Promise)
+], ReportController.prototype, "getStatisticsExcel", null);
 exports.ReportController = ReportController = __decorate([
     (0, common_1.Controller)('report'),
     __metadata("design:paramtypes", [report_service_1.ReportService])

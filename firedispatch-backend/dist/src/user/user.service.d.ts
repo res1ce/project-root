@@ -19,8 +19,8 @@ export declare class UserService {
             updatedAt: Date;
             createdAt: Date;
             fireIncidentId: number;
-            userId: number;
             content: string;
+            userId: number;
         }[];
     } & {
         id: number;
