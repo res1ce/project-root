@@ -1,17 +1,16 @@
 'use client';
 
 import { ReactNode, useEffect } from 'react';
-import { useFireEvents } from '@/hooks/use-fire-events';
 import { useFireStore } from '@/store/fire-store';
 import { useSystemSettingsStore } from '@/store/system-settings-store';
 import { Toaster } from 'react-hot-toast';
+import { NotificationsProvider } from '@/components/layout/notifications';
 
 interface ProvidersProps {
   children: ReactNode;
 }
 
 export function Providers({ children }: ProvidersProps) {
-  const { connected } = useFireEvents();
   const { loadFires, loadFireLevels, loadFireStations } = useFireStore();
   const { fetchSettings } = useSystemSettingsStore();
 
@@ -24,19 +23,12 @@ export function Providers({ children }: ProvidersProps) {
     fetchSettings().catch(err => console.error('Ошибка загрузки настроек:', err));
   }, [loadFires, loadFireLevels, loadFireStations, fetchSettings]);
 
-  // Логируем статус WebSocket соединения
-  useEffect(() => {
-    if (connected) {
-      console.log('WebSocket соединение установлено');
-    } else {
-      console.log('WebSocket соединение отсутствует или еще не установлено');
-    }
-  }, [connected]);
-
   return (
     <>
       <Toaster position="top-right" />
-      {children}
+      <NotificationsProvider>
+        {children}
+      </NotificationsProvider>
     </>
   );
 } 

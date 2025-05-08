@@ -24,7 +24,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
         router.push('/login');
       });
     }
-  }, [isAuthenticated, checkAuth, router]);
+
+    // Логируем статус WebSocket
+    console.log(`AppLayout: WebSocket ${connected ? 'подключен' : 'отключен'}`);
+    
+  }, [isAuthenticated, checkAuth, router, connected]);
 
   // Если идет загрузка, показываем индикатор
   if (isLoading) {

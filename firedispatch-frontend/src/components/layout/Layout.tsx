@@ -1,6 +1,5 @@
 import { ReactNode, useEffect } from 'react';
 import AppHeader from './app-header';
-import { useFireEvents } from '@/hooks/use-fire-events';
 import { useFireStore } from '@/store/fire-store';
 import { useSystemSettingsStore } from '@/store/system-settings-store';
 
@@ -9,7 +8,6 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { connected } = useFireEvents();
   const { loadFires, loadFireLevels, loadFireStations } = useFireStore();
   const { fetchSettings } = useSystemSettingsStore();
 
@@ -20,14 +18,7 @@ export default function Layout({ children }: LayoutProps) {
     loadFireLevels();
     loadFireStations();
     fetchSettings();
-    
-    // Логируем статус соединения
-    if (connected) {
-      console.log('WebSocket соединение установлено');
-    } else {
-      console.log('WebSocket соединение отсутствует');
-    }
-  }, [loadFires, loadFireLevels, loadFireStations, fetchSettings, connected]);
+  }, [loadFires, loadFireLevels, loadFireStations, fetchSettings]);
 
   return (
     <div className="min-h-screen flex flex-col">

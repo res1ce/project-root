@@ -171,19 +171,37 @@ export function FireCreationModal({
     const isAutoLevel = fireLevelId === -1;
     
     try {
+      // Корректируем порядок координат - сервер ожидает [longitude, latitude]
+      // на фронтенде обычно используется [latitude, longitude]
+      const longitude = location[1];
+      const latitude = location[0];
+      
+      console.log(`Координаты: [${longitude}, ${latitude}]`);
+      
       const createFireData: any = {
-        location: [location[0], location[1]] as [number, number],
-        levelId: isAutoLevel ? undefined : fireLevelId, // Если выбрано "Авто", не отправляем levelId
-        status: 'active',
+        location: [longitude, latitude] as [number, number], // Меняем порядок с [lat, lng] на [lng, lat]
+        status: 'PENDING',
         address: fireAddress,
-        description: fireDescription || undefined
+        description: fireDescription || undefined,
+        assignedToId: null // Это поле будет заполнено на сервере тем же значением, что и reportedById
       };
       
-      // Если выбрано "Авто", добавляем флаг для бэкенда
+      // Если выбрано "Авто", добавляем флаг для бэкенда, иначе отправляем levelId
       if (isAutoLevel) {
-        Object.assign(createFireData, { autoLevel: true });
+        createFireData.autoLevel = true;
+      } else {
+        createFireData.levelId = fireLevelId;
       }
       
+      console.log('Отправка данных о пожаре:', JSON.stringify(createFireData, null, 2));
+      
+      // Проверяем правильность данных перед отправкой
+      if (!Array.isArray(createFireData.location) || createFireData.location.length !== 2 || 
+          typeof createFireData.location[0] !== 'number' || typeof createFireData.location[1] !== 'number') {
+        throw new Error('Некорректный формат координат');
+      }
+      
+      // Отправляем запрос на сервер
       await createFire(createFireData);
       
       toast({
@@ -198,17 +216,29 @@ export function FireCreationModal({
     } catch (error: any) {
       console.error('Error creating fire:', error);
       
-      // Более информативное сообщение об ошибке
-      if (error.response?.data?.message) {
-        toast({
-          title: 'Ошибка',
-          description: `${error.response.data.message}`,
-          variant: 'destructive'
-        });
+      // Более подробная информация об ошибке
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        
+        // Более информативное сообщение об ошибке
+        if (error.response.data?.message) {
+          toast({
+            title: 'Ошибка',
+            description: `${error.response.data.message}`,
+            variant: 'destructive'
+          });
+        } else {
+          toast({
+            title: 'Ошибка',
+            description: `Ошибка сервера: ${error.response.status}`,
+            variant: 'destructive'
+          });
+        }
       } else {
         toast({
           title: 'Ошибка',
-          description: 'Ошибка при регистрации пожара',
+          description: error.message || 'Ошибка при регистрации пожара',
           variant: 'destructive'
         });
       }
@@ -293,13 +323,18 @@ export function FireCreationModal({
               {levels && levels.length > 0 ? (
                 levels.map((level) => (
                   <option key={level.id} value={level.id}>
-                    {level.name}
+                    {level.name} - {level.description}
                   </option>
                 ))
               ) : (
                 <option value="" disabled>Загрузка уровней...</option>
               )}
             </Select>
+            {fireLevelId === -1 && (
+              <p className="text-xs text-gray-500 mt-1">
+                Система автоматически определит уровень пожара на основе местоположения и подберет необходимую технику
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

@@ -296,13 +296,9 @@ export declare class FireController {
     }>;
     create(dto: CreateFireDto, req: RequestWithUser): Promise<{
         assignedVehicles: {
-            id: number;
-            updatedAt: Date;
-            createdAt: Date;
-            model: string;
-            type: import(".prisma/client").$Enums.VehicleType;
-            status: import(".prisma/client").$Enums.VehicleStatus;
-            fireStationId: number;
+            id: any;
+            type: any;
+            name: any;
         }[];
         fireStation: {
             id: number;

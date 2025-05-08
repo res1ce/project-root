@@ -15,73 +15,194 @@ export class FireService {
   ) {}
 
   async create(dto: CreateFireDto) {
-    // Если уровень пожара не указан, определяем автоматически
+    // Извлекаем координаты
+    console.log(`[DEBUG] Исходные координаты пожара:`, JSON.stringify(dto.location));
+    
+    if (!dto.location || !Array.isArray(dto.location) || dto.location.length !== 2) {
+      console.error('[ERROR] Некорректный формат координат пожара:', dto.location);
+      throw new BadRequestException('Некорректные координаты местоположения пожара');
+    }
+    
+    const [longitude, latitude] = dto.location;
+    
+    console.log(`[DEBUG] Извлеченные координаты пожара: широта=${latitude}, долгота=${longitude}`);
+    
+    if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
+        isNaN(latitude) || isNaN(longitude)) {
+      console.error('[ERROR] Координаты не являются числами:', { latitude, longitude });
+      throw new BadRequestException('Координаты должны быть числами');
+    }
+    
+    // Обработка автоматического определения уровня пожара
+    if (dto.autoLevel) {
+      // Используем адрес и координаты для определения уровня пожара
+      const fireLevelNumber = await this.determineFireLevel(dto.location, dto.address);
+      
+      // Получаем уровень по его номеру
+      const fireLevel = await this.getLevelByNumber(fireLevelNumber);
+      if (fireLevel) {
+        dto.levelId = fireLevel.id;
+      } else {
+        // Если уровень не найден, используем первый доступный
+        const firstLevel = await this.getFirstLevel();
+        if (firstLevel) {
+          dto.levelId = firstLevel.id;
+        } else {
+          throw new BadRequestException('В системе не настроены уровни пожаров');
+        }
+      }
+    }
+    
+    // Проверяем, что уровень пожара указан
     if (!dto.levelId) {
-      dto.levelId = await this.determineFireLevel(dto.location, dto.address);
+      throw new BadRequestException('Необходимо указать уровень пожара или включить автоматическое определение');
     }
 
-    // 1. Получаем уровень пожара
+    // 1. Получаем уровень пожара со всеми требованиями к технике
     const fireLevel = await this.prisma.fireLevel.findUnique({
-      where: { level: dto.levelId },
+      where: { id: dto.levelId },
       include: {
         requirements: true
       }
     });
 
     if (!fireLevel) {
-      throw new NotFoundException(`Уровень пожара ${dto.levelId} не найден`);
+      throw new NotFoundException(`Уровень пожара с ID ${dto.levelId} не найден`);
     }
 
-    // 2. Находим ближайшую пожарную часть
+    // 2. Находим ближайшие пожарные части и сортируем их по расстоянию
     const fireStations = await this.prisma.fireStation.findMany();
     
-    // Extract latitude and longitude from location array
-    const [longitude, latitude] = dto.location;
-    
-    // Функция для расчета расстояния между двумя точками (используя формулу Хаверсина)
-    const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-      const R = 6371; // Радиус Земли в км
-      const dLat = this.deg2rad(lat2 - lat1);
-      const dLon = this.deg2rad(lon2 - lon1);
-      const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2); 
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-      return R * c; // Расстояние в км
-    };
-    
     // Сортируем станции по расстоянию
+    console.log(`[DEBUG] Получено ${fireStations.length} пожарных частей`);
+    
+    // Добавляем отладочную информацию о всех пожарных частях
+    fireStations.forEach(station => {
+      console.log(`[DEBUG] Пожарная часть ${station.name} (id: ${station.id}): координаты [${station.latitude}, ${station.longitude}]`);
+    });
+    
+    // Важно! В методе calculateDistance порядок аргументов: (lat1, lon1, lat2, lon2)
     const sortedStations = fireStations
-      .map(station => ({
-        ...station,
-        distance: getDistance(latitude, longitude, station.latitude, station.longitude)
-      }))
+      .map(station => {
+        const distance = this.calculateDistance(
+          latitude, longitude,
+          station.latitude, station.longitude
+        );
+        
+        return {
+          ...station,
+          distance
+        };
+      })
       .sort((a, b) => a.distance - b.distance);
+    
+    console.log(`[DEBUG] Отсортированные станции по расстоянию:`);
+    sortedStations.forEach((station, index) => {
+      console.log(`[DEBUG] ${index + 1}. ${station.name} (id: ${station.id}): ${station.distance.toFixed(3)} км`);
+    });
     
     if (sortedStations.length === 0) {
       throw new BadRequestException('Нет доступных пожарных частей');
     }
     
-    // 3. Создаем инцидент
-    const fireIncident = await this.prisma.fireIncident.create({
-      data: {
-        latitude,
-        longitude,
-        status: dto.status as IncidentStatus || IncidentStatus.PENDING,
-        reportedBy: {
-          connect: { id: dto.reportedById }
-        },
-        assignedTo: {
-          connect: { id: dto.assignedToId || dto.reportedById }
-        },
-        fireStation: {
-          connect: { id: dto.assignedStationId || sortedStations[0].id }
-        },
-        fireLevel: {
-          connect: { id: fireLevel.id }
+    // 3. Проверяем доступность техники в пожарных частях начиная с ближайшей
+    let selectedStation = null;
+    let assignedVehicles: any[] = [];
+    
+    // Получаем требования к технике для данного уровня пожара
+    const requirements = await this.prisma.fireLevelRequirement.findMany({
+      where: { fireLevelId: fireLevel.id }
+    });
+    
+    console.log(`[DEBUG] Найдено ${requirements.length} требований к технике для уровня ${fireLevel.level}`);
+    
+    // Если нет требований к технике, просто берем ближайшую станцию
+    if (requirements.length === 0) {
+      console.log(`[DEBUG] Нет требований к технике, выбираем ближайшую пожарную часть`);
+      selectedStation = sortedStations[0];
+      console.log(`[DEBUG] Выбрана ближайшая станция: ${selectedStation.name} (id: ${selectedStation.id}) на расстоянии ${selectedStation.distance.toFixed(3)} км`);
+    } else {
+      // Есть требования к технике, проверяем наличие в ближайших частях
+      console.log(`[DEBUG] Проверяем наличие необходимой техники в пожарных частях`);
+      
+      for (const station of sortedStations) {
+        console.log(`[DEBUG] Проверяем станцию ${station.name} (id: ${station.id}) на расстоянии ${station.distance.toFixed(3)} км`);
+        
+        // Получаем доступную технику на этой станции
+        const availableVehicles = await this.prisma.vehicle.findMany({
+          where: {
+            fireStationId: station.id,
+            status: VehicleStatus.AVAILABLE
+          }
+        });
+        
+        console.log(`[DEBUG] Доступно ${availableVehicles.length} единиц техники на станции ${station.name}`);
+        
+        // Проверяем, достаточно ли техники для всех требований
+        let hasAllRequired = true;
+        const assignedVehiclesForStation: any[] = [];
+        
+        // Проверяем каждое требование
+        for (const requirement of requirements) {
+          // Ищем доступные машины данной модели
+          const availableOfType = availableVehicles.filter(
+            v => v.type === requirement.vehicleType && 
+                 !assignedVehiclesForStation.includes(v.id)
+          );
+          
+          console.log(`[DEBUG] Требуется ${requirement.count} единиц техники типа ${requirement.vehicleType}, доступно: ${availableOfType.length}`);
+          
+          // Если нет достаточного количества, отмечаем эту станцию как непригодную
+          if (availableOfType.length < requirement.count) {
+            hasAllRequired = false;
+            console.log(`[DEBUG] Недостаточно техники на станции ${station.name} для требования: нужно ${requirement.count}, доступно ${availableOfType.length}`);
+            break;
+          }
+          
+          // Добавляем нужное количество машин в список назначенных
+          for (let i = 0; i < requirement.count; i++) {
+            assignedVehiclesForStation.push(availableOfType[i].id);
+          }
         }
-      },
+        
+        // Если на этой станции есть вся необходимая техника, выбираем её
+        if (hasAllRequired) {
+          selectedStation = station;
+          assignedVehicles = assignedVehiclesForStation;
+          console.log(`[DEBUG] Выбрана станция ${selectedStation.name} (id: ${selectedStation.id}) с достаточным количеством техники`);
+          break;
+        }
+      }
+      
+      // Если не нашли станцию с достаточным количеством техники, берем ближайшую
+      if (!selectedStation && sortedStations.length > 0) {
+        selectedStation = sortedStations[0];
+        console.log(`[DEBUG] Не найдено станций с достаточным количеством техники. Выбрана ближайшая: ${selectedStation.name}`);
+      }
+    }
+    
+    if (!selectedStation) {
+      throw new BadRequestException('Не удалось выбрать пожарную часть');
+    }
+    
+    // Создаем базовый объект данных
+    const fireData: any = {
+      latitude,
+      longitude,
+      status: dto.status || IncidentStatus.PENDING,
+      fireStationId: selectedStation.id,
+      fireLevelId: fireLevel.id,
+      reportedById: dto.reportedById
+    };
+    
+    // Добавляем опциональные поля, если они предоставлены
+    if (dto.address) fireData.address = dto.address;
+    if (dto.description) fireData.description = dto.description;
+    if (dto.assignedToId) fireData.assignedToId = dto.assignedToId;
+    
+    // 4. Создаем инцидент с выбранной станцией
+    const fireIncident = await this.prisma.fireIncident.create({
+      data: fireData,
       include: {
         reportedBy: true,
         assignedTo: true,
@@ -90,27 +211,41 @@ export class FireService {
       }
     });
     
-    // 4. Получаем доступные машины из ближайшей части
-    const availableVehicles = await this.prisma.vehicle.findMany({
-      where: {
-        fireStationId: sortedStations[0].id,
-        status: VehicleStatus.AVAILABLE
-      }
-    });
+    // 5. Назначаем выбранную технику на пожар
+    console.log(`[DEBUG] Назначаем ${assignedVehicles.length} единиц техники на пожар #${fireIncident.id}`);
     
-    // 5. Получаем требования к машинам для этого уровня
-    const requiredVehicles = fireLevel.requirements;
-    
-    const assignedVehicles = [];
-    
-    for (const requirement of requiredVehicles) {
-      const matchingVehicles = availableVehicles
-        .filter(v => v.type === requirement.vehicleType)
-        .slice(0, requirement.count);
+    // Проверяем, есть ли доступная техника для назначения
+    if (assignedVehicles.length === 0) {
+      console.log(`[DEBUG] Нет назначенной техники, получаем всю доступную технику выбранной части`);
       
-      for (const vehicle of matchingVehicles) {
-        await this.prisma.vehicle.update({
-          where: { id: vehicle.id },
+      // Если нет назначенной техники, берем доступную технику выбранной части
+      const stationVehicles = await this.prisma.vehicle.findMany({
+        where: {
+          fireStationId: selectedStation.id,
+          status: VehicleStatus.AVAILABLE
+        },
+        take: 2 // Ограничиваем количество, чтобы не брать всю технику
+      });
+      
+      if (stationVehicles.length > 0) {
+        console.log(`[DEBUG] Найдено ${stationVehicles.length} единиц доступной техники`);
+        assignedVehicles = stationVehicles;
+      } else {
+        console.log(`[DEBUG] Не найдено доступной техники в выбранной части`);
+      }
+    }
+    
+    // Массив для хранения назначенной техники
+    const updatedVehicles = [];
+    
+    // Назначаем технику на пожар и меняем статус
+    for (const vehicle of assignedVehicles) {
+      console.log(`[DEBUG] Назначаем технику ID: ${vehicle.id}, модель: ${vehicle.model} на пожар #${fireIncident.id}`);
+      
+      try {
+        // Обновляем статус техники и привязываем к пожару
+        const updatedVehicle = await this.prisma.vehicle.update({
+          where: { id: typeof vehicle === 'object' ? vehicle.id : vehicle },
           data: {
             status: VehicleStatus.ON_DUTY,
             incidents: {
@@ -119,39 +254,60 @@ export class FireService {
           }
         });
         
-        assignedVehicles.push(vehicle);
+        updatedVehicles.push(updatedVehicle);
+        console.log(`[DEBUG] Техника ID: ${updatedVehicle.id} успешно назначена и статус изменен на ON_DUTY`);
+      } catch (error) {
+        console.error(`[ERROR] Ошибка при назначении техники ID: ${vehicle.id || vehicle}:`, error);
       }
     }
     
-    // 6. Если не хватает машин в ближайшей части, переназначаем на следующую ближайшую
-    const requiredVehicleCount = requiredVehicles.reduce((sum, r) => sum + r.count, 0);
-    if (assignedVehicles.length < requiredVehicleCount && sortedStations.length > 1) {
-      // Обновляем назначение
-      await this.prisma.fireIncident.update({
-        where: { id: fireIncident.id },
-        data: {
-          fireStation: {
-            connect: { id: sortedStations[1].id }
-          }
-        }
-      });
-      
-      // TODO: В реальном приложении здесь нужна более сложная логика
-    }
+    console.log(`[DEBUG] Успешно назначено ${updatedVehicles.length} единиц техники из ${assignedVehicles.length}`);
     
-    // 7. Отправляем уведомление через WebSocket
-    this.events.fireCreated({
-      id: fireIncident.id,
-      latitude: fireIncident.latitude,
-      longitude: fireIncident.longitude,
-      level: fireIncident.fireLevel.level,
-      status: fireIncident.status,
-      assignedStation: fireIncident.fireStation
+    // Получаем уровень пожара и пожарную станцию для WebSocket уведомлений
+    const fireLevel1 = await this.prisma.fireLevel.findUnique({
+      where: { id: fireLevel.id },
+      select: {
+        id: true,
+        level: true,
+        name: true
+      }
     });
+    
+    const fireStation = await this.prisma.fireStation.findUnique({
+      where: { id: selectedStation.id }
+    });
+    
+    // Получаем полные данные о созданном пожаре
+    const completeFireData = await this.prisma.fireIncident.findUnique({
+      where: { id: fireIncident.id },
+      include: {
+        fireLevel: true,
+        fireStation: true,
+        reportedBy: {
+          select: { id: true, name: true }
+        }
+      }
+    });
+    
+    // 6. Отправляем уведомление через WebSocket о создании пожара
+    this.events.fireCreated({
+      ...completeFireData,
+      level: fireLevel1?.level || fireLevel.level,
+      status: fireIncident.status
+    });
+    
+    // 7. Отправляем отдельное уведомление для станции, которой назначен пожар
+    this.events.fireAssigned({
+      id: fireIncident.id,
+      fire: completeFireData,
+      assignedStationId: selectedStation.id
+    });
+    
+    console.log(`[DEBUG] Создан пожар #${fireIncident.id}, уровень ${fireLevel.level}, назначен станции ${selectedStation.name}`);
     
     return {
       ...fireIncident,
-      assignedVehicles
+      assignedVehicles: assignedVehicles.map(v => ({ id: v.id, type: v.type, name: v.name }))
     };
   }
 
@@ -728,6 +884,16 @@ export class FireService {
   
   // Вспомогательная функция для расчета расстояния между точками в км (по формуле Хаверсина)
   private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    console.log(`[DEBUG] Расчет расстояния между точками [${lat1}, ${lon1}] и [${lat2}, ${lon2}]`);
+    
+    // Проверка наличия координат
+    if (typeof lat1 !== 'number' || typeof lon1 !== 'number' || 
+        typeof lat2 !== 'number' || typeof lon2 !== 'number' ||
+        isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) {
+      console.error('[ERROR] Некорректные координаты в calculateDistance');
+      return Number.MAX_SAFE_INTEGER; // Возвращаем максимально большое расстояние при некорректных данных
+    }
+    
     const R = 6371; // Радиус Земли в км
     const dLat = this.deg2rad(lat2 - lat1);
     const dLon = this.deg2rad(lon2 - lon1);
@@ -736,7 +902,10 @@ export class FireService {
       Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * 
       Math.sin(dLon/2) * Math.sin(dLon/2); 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    return R * c; // Расстояние в км
+    const distance = R * c; // Расстояние в км
+    
+    console.log(`[DEBUG] Рассчитанное расстояние: ${distance.toFixed(3)} км`);
+    return distance;
   }
 
   // --- Методы для истории пожаров ---

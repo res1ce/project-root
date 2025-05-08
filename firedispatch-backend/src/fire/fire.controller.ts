@@ -156,53 +156,101 @@ export class FireController {
   @Roles('central_dispatcher')
   @Post()
   async create(@Body() dto: CreateFireDto, @Req() req: RequestWithUser) {
+    console.log(`[DEBUG] Создание пожара: получены данные`, JSON.stringify(dto, null, 2));
+    
+    // Проверяем корректность входных данных
+    if (!dto.location || !Array.isArray(dto.location) || dto.location.length !== 2) {
+      console.error('[ERROR] Некорректные координаты:', dto.location);
+      throw new BadRequestException('Некорректные координаты местоположения пожара');
+    }
+    
+    if (!dto.location.every(coord => typeof coord === 'number' && !isNaN(coord))) {
+      console.error('[ERROR] Координаты не являются числами:', dto.location);
+      throw new BadRequestException('Координаты должны быть числами');
+    }
+    
+    if (!dto.address || dto.address.trim() === '') {
+      console.error('[ERROR] Отсутствует адрес пожара');
+      throw new BadRequestException('Адрес пожара обязателен');
+    }
+    
     // Получаем текущего пользователя из запроса
     const userId = req.user.userId;
+    console.log(`[DEBUG] ID пользователя: ${userId}`);
     
     // Устанавливаем reportedById из текущего пользователя
     dto.reportedById = userId;
     
+    // Если assignedToId не установлен, используем того же пользователя
+    if (!dto.assignedToId) {
+      console.log(`[DEBUG] assignedToId не указан, устанавливаем равным reportedById (${userId})`);
+      dto.assignedToId = userId;
+    }
+    
     // Если указан флаг autoLevel, автоматически определяем уровень пожара
     if (dto.autoLevel) {
+      console.log(`[DEBUG] Включено автоматическое определение уровня пожара`);
       // Используем адрес и координаты для определения уровня пожара
       const determinedLevel = await this.fireService.determineFireLevel(dto.location, dto.address);
+      console.log(`[DEBUG] Определен уровень пожара: ${determinedLevel}`);
       
       // Получаем ID уровня пожара на основе его номера
       const fireLevel = await this.fireService.getLevelByNumber(determinedLevel);
       if (fireLevel) {
+        console.log(`[DEBUG] Найден уровень пожара по номеру: ${fireLevel.id} (${fireLevel.name})`);
         dto.levelId = fireLevel.id;
       } else {
+        console.log(`[DEBUG] Уровень пожара ${determinedLevel} не найден, используем первый доступный`);
         // Если уровень не найден, используем первый доступный
         const firstLevel = await this.fireService.getFirstLevel();
         if (firstLevel) {
+          console.log(`[DEBUG] Первый доступный уровень: ${firstLevel.id} (${firstLevel.name})`);
           dto.levelId = firstLevel.id;
         } else {
+          console.error('[ERROR] В системе не настроены уровни пожаров');
           throw new BadRequestException('В системе не настроены уровни пожаров');
         }
       }
-    }
-    
-    // Проверяем, что уровень пожара указан
-    if (!dto.levelId) {
+    } else if (!dto.levelId) {
+      console.error('[ERROR] Не указан уровень пожара и не включено автоопределение');
       throw new BadRequestException('Необходимо указать уровень пожара или включить автоматическое определение');
+    } else {
+      console.log(`[DEBUG] Указан уровень пожара: ${dto.levelId}`);
     }
     
-    const result = await this.fireService.create(dto);
+    console.log(`[DEBUG] Окончательные данные для создания пожара:`, JSON.stringify({
+      location: dto.location,
+      levelId: dto.levelId,
+      address: dto.address,
+      status: dto.status,
+      autoLevel: dto.autoLevel,
+      reportedById: dto.reportedById,
+      assignedToId: dto.assignedToId,
+      description: dto.description
+    }, null, 2));
     
-    // Логируем создание пожара
-    await this.userActivityService.logActivity(
-      userId,
-      'create_fire',
-      {
-        fireId: result.id,
-        location: dto.location,
-        levelId: dto.levelId,
-        autoLevel: dto.autoLevel || false
-      },
-      req
-    );
-    
-    return result;
+    try {
+      const result = await this.fireService.create(dto);
+      console.log(`[DEBUG] Пожар успешно создан с ID: ${result.id}`);
+      
+      // Логируем создание пожара
+      await this.userActivityService.logActivity(
+        userId,
+        'create_fire',
+        {
+          fireId: result.id,
+          location: dto.location,
+          levelId: dto.levelId,
+          autoLevel: dto.autoLevel || false
+        },
+        req
+      );
+      
+      return result;
+    } catch (error) {
+      console.error('[ERROR] Ошибка при создании пожара:', error);
+      throw error;
+    }
   }
 
   @UseGuards(JwtAuthGuard)

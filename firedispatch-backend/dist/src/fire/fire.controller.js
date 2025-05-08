@@ -101,35 +101,80 @@ let FireController = class FireController {
         return this.fireService.deleteAddressLevel(Number(id));
     }
     async create(dto, req) {
+        console.log(`[DEBUG] Создание пожара: получены данные`, JSON.stringify(dto, null, 2));
+        if (!dto.location || !Array.isArray(dto.location) || dto.location.length !== 2) {
+            console.error('[ERROR] Некорректные координаты:', dto.location);
+            throw new common_1.BadRequestException('Некорректные координаты местоположения пожара');
+        }
+        if (!dto.location.every(coord => typeof coord === 'number' && !isNaN(coord))) {
+            console.error('[ERROR] Координаты не являются числами:', dto.location);
+            throw new common_1.BadRequestException('Координаты должны быть числами');
+        }
+        if (!dto.address || dto.address.trim() === '') {
+            console.error('[ERROR] Отсутствует адрес пожара');
+            throw new common_1.BadRequestException('Адрес пожара обязателен');
+        }
         const userId = req.user.userId;
+        console.log(`[DEBUG] ID пользователя: ${userId}`);
         dto.reportedById = userId;
+        if (!dto.assignedToId) {
+            console.log(`[DEBUG] assignedToId не указан, устанавливаем равным reportedById (${userId})`);
+            dto.assignedToId = userId;
+        }
         if (dto.autoLevel) {
+            console.log(`[DEBUG] Включено автоматическое определение уровня пожара`);
             const determinedLevel = await this.fireService.determineFireLevel(dto.location, dto.address);
+            console.log(`[DEBUG] Определен уровень пожара: ${determinedLevel}`);
             const fireLevel = await this.fireService.getLevelByNumber(determinedLevel);
             if (fireLevel) {
+                console.log(`[DEBUG] Найден уровень пожара по номеру: ${fireLevel.id} (${fireLevel.name})`);
                 dto.levelId = fireLevel.id;
             }
             else {
+                console.log(`[DEBUG] Уровень пожара ${determinedLevel} не найден, используем первый доступный`);
                 const firstLevel = await this.fireService.getFirstLevel();
                 if (firstLevel) {
+                    console.log(`[DEBUG] Первый доступный уровень: ${firstLevel.id} (${firstLevel.name})`);
                     dto.levelId = firstLevel.id;
                 }
                 else {
+                    console.error('[ERROR] В системе не настроены уровни пожаров');
                     throw new common_1.BadRequestException('В системе не настроены уровни пожаров');
                 }
             }
         }
-        if (!dto.levelId) {
+        else if (!dto.levelId) {
+            console.error('[ERROR] Не указан уровень пожара и не включено автоопределение');
             throw new common_1.BadRequestException('Необходимо указать уровень пожара или включить автоматическое определение');
         }
-        const result = await this.fireService.create(dto);
-        await this.userActivityService.logActivity(userId, 'create_fire', {
-            fireId: result.id,
+        else {
+            console.log(`[DEBUG] Указан уровень пожара: ${dto.levelId}`);
+        }
+        console.log(`[DEBUG] Окончательные данные для создания пожара:`, JSON.stringify({
             location: dto.location,
             levelId: dto.levelId,
-            autoLevel: dto.autoLevel || false
-        }, req);
-        return result;
+            address: dto.address,
+            status: dto.status,
+            autoLevel: dto.autoLevel,
+            reportedById: dto.reportedById,
+            assignedToId: dto.assignedToId,
+            description: dto.description
+        }, null, 2));
+        try {
+            const result = await this.fireService.create(dto);
+            console.log(`[DEBUG] Пожар успешно создан с ID: ${result.id}`);
+            await this.userActivityService.logActivity(userId, 'create_fire', {
+                fireId: result.id,
+                location: dto.location,
+                levelId: dto.levelId,
+                autoLevel: dto.autoLevel || false
+            }, req);
+            return result;
+        }
+        catch (error) {
+            console.error('[ERROR] Ошибка при создании пожара:', error);
+            throw error;
+        }
     }
     async getById(id) {
         const numId = Number(id);

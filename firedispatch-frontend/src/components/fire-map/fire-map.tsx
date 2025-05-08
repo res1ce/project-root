@@ -972,9 +972,9 @@ export default function FireMap({
       console.log(`[DEBUG] После фильтрации для диспетчера станции осталось ${firesForDisplay.length} пожаров`);
     }
     
-    // Фильтруем, чтобы не показывать потушенные пожары
+    // Фильтруем, чтобы не показывать потушенные и отмененные пожары
     const activeFiresOnly = firesForDisplay.filter(fire => 
-      fire.status !== 'RESOLVED'
+      fire.status !== 'RESOLVED' && fire.status !== 'CANCELLED'
     );
     
     console.log('[DEBUG] Добавляем маркеры активных пожаров:', activeFiresOnly.length, 'из', fires.length);
@@ -1102,6 +1102,172 @@ export default function FireMap({
       console.log('[DEBUG] Отображение маркеров станций отключено или нет данных');
     }
   }, [fires, stations, mapInitialized, showStations, closeActivePopup, getFirePopupHtml, getStationPopupHtml, onFireSelect, user]);
+
+  // Функция для удаления всех маркеров с карты
+  const clearAllMarkers = useCallback(() => {
+    console.log('[DEBUG] clearAllMarkers: Очистка всех маркеров с карты');
+    
+    try {
+      if (markersRef.current) {
+        // Убираем все маркеры
+        Object.values(markersRef.current).forEach(marker => {
+          try {
+            if (marker && typeof marker.destroy === 'function') {
+              marker.destroy();
+            }
+          } catch (e) {
+            console.error('[DEBUG] Ошибка при удалении маркера:', e);
+          }
+        });
+        
+        // Очищаем справочник маркеров
+        markersRef.current = {};
+        
+        console.log('[DEBUG] clearAllMarkers: Все маркеры очищены');
+      }
+      
+      // Закрываем открытые попапы
+      closeActivePopup();
+    } catch (e) {
+      console.error('[DEBUG] clearAllMarkers: Ошибка при очистке маркеров:', e);
+    }
+  }, [closeActivePopup]);
+
+  // Функция для полного обновления данных на карте
+  const refreshMapData = useCallback(() => {
+    console.log('[DEBUG] refreshMapData: Обновляем все данные на карте');
+    
+    // Очищаем существующие маркеры
+    clearAllMarkers();
+    
+    // Перерисовываем все маркеры
+    if (mapInstanceRef.current && MapGLRef.current) {
+      try {
+        console.log('[DEBUG] refreshMapData: Перерисовываем маркеры пожаров');
+        
+        // Фильтруем только активные пожары (не показываем завершенные и отмененные)
+        const activeFiresOnly = fires.filter(fire => 
+          fire.status !== 'RESOLVED' && fire.status !== 'CANCELLED'
+        );
+        
+        console.log(`[DEBUG] refreshMapData: Отфильтровано ${activeFiresOnly.length} активных пожаров из ${fires.length} общих`);
+        
+        // Создаем маркеры пожаров
+        if (activeFiresOnly && activeFiresOnly.length > 0) {
+          activeFiresOnly.forEach(fire => {
+            // Получаем координаты пожара
+            const fireCoords = getFireCoordinates(fire);
+            if (!fireCoords.lat || !fireCoords.lng) return;
+            
+            // Создаем маркер для пожара
+            const coordinates: [number, number] = [fireCoords.lng, fireCoords.lat]; // [lng, lat] для 2GIS
+            
+            // Создаем маркер, если он еще не существует
+            if (!markersRef.current[`fire_${fire.id}`] && mapInstanceRef.current && MapGLRef.current) {
+              const marker = new MapGLRef.current.Marker(mapInstanceRef.current, {
+                coordinates,
+                icon: FIRE_MARKER_OPTIONS.icon,
+                size: FIRE_MARKER_OPTIONS.size,
+                anchor: FIRE_MARKER_OPTIONS.anchor,
+                userData: { type: 'fire', id: fire.id },
+                interactive: true
+              });
+              
+              markersRef.current[`fire_${fire.id}`] = marker;
+              
+              // Добавляем обработчик клика по маркеру
+              marker.on('click', () => {
+                closeActivePopup();
+                const popupHtml = getFirePopupHtml(fire);
+                showPopup(coordinates, popupHtml);
+                
+                if (onFireSelect) {
+                  onFireSelect(fire);
+                }
+              });
+            }
+          });
+        }
+        
+        // Создаем маркеры пожарных частей, если нужно
+        if (showStations && stations && stations.length > 0) {
+          console.log('[DEBUG] refreshMapData: Перерисовываем маркеры пожарных частей');
+          
+          stations.forEach(station => {
+            try {
+              if (!station.latitude || !station.longitude) return;
+              
+              const coordinates: [number, number] = [station.longitude, station.latitude]; // [lng, lat] для 2GIS
+              
+              // Создаем маркер для станции, если он еще не существует
+              if (!markersRef.current[`station_${station.id}`] && mapInstanceRef.current && MapGLRef.current) {
+                const marker = new MapGLRef.current.Marker(mapInstanceRef.current, {
+                  coordinates,
+                  icon: STATION_MARKER_OPTIONS.icon,
+                  size: STATION_MARKER_OPTIONS.size,
+                  anchor: STATION_MARKER_OPTIONS.anchor,
+                  userData: { type: 'station', id: station.id },
+                  interactive: true
+                });
+                
+                markersRef.current[`station_${station.id}`] = marker;
+                
+                // Добавляем обработчик клика по маркеру
+                marker.on('click', () => {
+                  closeActivePopup();
+                  const popupHtml = getStationPopupHtml(station);
+                  showPopup(coordinates, popupHtml);
+                });
+              }
+            } catch (e) {
+              console.error(`[DEBUG] refreshMapData: Ошибка при создании маркера станции ${station.id}:`, e);
+            }
+          });
+        }
+        
+        console.log('[DEBUG] refreshMapData: Данные на карте обновлены');
+      } catch (e) {
+        console.error('[DEBUG] refreshMapData: Ошибка при обновлении маркеров:', e);
+      }
+    } else {
+      console.log('[DEBUG] refreshMapData: Карта не инициализирована, пропускаем обновление');
+    }
+  }, [
+    clearAllMarkers, 
+    fires, 
+    stations, 
+    showStations, 
+    MapGLRef, 
+    mapInstanceRef, 
+    closeActivePopup,
+    getFireCoordinates,
+    getFirePopupHtml,
+    getStationPopupHtml,
+    showPopup,
+    onFireSelect
+  ]);
+  
+  // Периодическое обновление данных на карте для предотвращения исчезновения маркеров
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapInitialized) return;
+    
+    console.log('[DEBUG] Настройка периодического обновления данных на карте');
+    
+    // Обновляем данные сразу после инициализации
+    setTimeout(() => {
+      refreshMapData();
+    }, 1000);
+    
+    // Настраиваем периодическое обновление каждые 15 секунд
+    const intervalId = setInterval(() => {
+      console.log('[DEBUG] Выполняем периодическое обновление данных на карте');
+      refreshMapData();
+    }, 15000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [mapInitialized, refreshMapData]);
 
   return (
     <div className="h-full w-full relative">

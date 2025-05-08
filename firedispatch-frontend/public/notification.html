@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Звуковое уведомление</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <button id="playButton" style="width:100%;height:100%;opacity:0">Звук</button>
+
+  <script>
+    // Создаем простой обработчик ошибок, чтобы они не выбрасывались в консоль
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.log('Перехвачена ошибка:', message);
+      return true; // Предотвращаем показ ошибки в консоли
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const button = document.getElementById('playButton');
+      
+      // Функция для воспроизведения звука
+      function attemptPlaySound() {
+        try {
+          // Создаем новый элемент при каждой попытке
+          const audio = new Audio();
+          
+          // Устанавливаем обработчик ошибок
+          audio.onerror = function(e) {
+            console.log('Ошибка аудио:', e);
+          };
+          
+          // Пробуем разные источники
+          if (Math.random() > 0.5) {
+            audio.src = '/alert.mp3';
+          } else {
+            audio.src = '/sounds/alert.mp3';
+          }
+          
+          // Громкость на максимум
+          audio.volume = 1.0;
+          
+          // Пытаемся воспроизвести
+          var promise = audio.play();
+          if (promise !== undefined) {
+            promise.then(_ => {
+              console.log("Воспроизведение началось!");
+            }).catch(error => {
+              console.log("Ошибка воспроизведения:", error);
+            });
+          }
+        } catch (err) {
+          console.log('Ошибка при попытке воспроизведения:', err);
+        }
+      }
+      
+      // Реагируем на сообщения
+      window.addEventListener('message', function(event) {
+        if (event.data === 'play') {
+          attemptPlaySound();
+        }
+      });
+      
+      // Кнопка для взаимодействия пользователя
+      button.addEventListener('click', attemptPlaySound);
+      
+      // Авто-клик после загрузки
+      setTimeout(function() {
+        button.click();
+      }, 100);
+    });
+  </script>
+</body>
+</html> 

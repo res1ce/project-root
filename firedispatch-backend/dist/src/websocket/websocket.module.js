@@ -11,12 +11,28 @@ const common_1 = require("@nestjs/common");
 const websocket_gateway_1 = require("./websocket.gateway");
 const websocket_service_1 = require("./websocket.service");
 const prisma_module_1 = require("../prisma/prisma.module");
+const jwt_1 = require("@nestjs/jwt");
+const config_1 = require("@nestjs/config");
 let WebsocketModule = class WebsocketModule {
 };
 exports.WebsocketModule = WebsocketModule;
 exports.WebsocketModule = WebsocketModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule],
+        imports: [
+            prisma_module_1.PrismaModule,
+            jwt_1.JwtModule.registerAsync({
+                imports: [config_1.ConfigModule],
+                useFactory: (configService) => ({
+                    secret: configService.get('JWT_SECRET') || process.env.JWT_SECRET || 'supersecret',
+                    signOptions: { expiresIn: '7d' },
+                    verifyOptions: {
+                        ignoreExpiration: false,
+                        ignoreNotBefore: false
+                    }
+                }),
+                inject: [config_1.ConfigService],
+            }),
+        ],
         providers: [websocket_gateway_1.WebsocketGateway, websocket_service_1.WebsocketService],
         exports: [websocket_service_1.WebsocketService],
     })
