@@ -7,6 +7,7 @@ class AuthViewModel: ObservableObject {
     @Published var isAuthenticated = false
     @Published var isLoading = false
     @Published var error: String?
+    @Published var token: String?
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -28,6 +29,7 @@ class AuthViewModel: ObservableObject {
                 }
             }, receiveValue: { [weak self] response in
                 self?.user = response.user
+                self?.token = response.accessToken
                 self?.isAuthenticated = true
                 self?.saveUser(response)
                 
@@ -49,6 +51,7 @@ class AuthViewModel: ObservableObject {
         WebSocketService.shared.disconnect()
         
         user = nil
+        token = nil
         isAuthenticated = false
         
         // Удаляем сохраненные данные
@@ -66,14 +69,15 @@ class AuthViewModel: ObservableObject {
     private func loadSavedUser() {
         if let userData = UserDefaults.standard.data(forKey: "authUser"),
            let savedUser = try? JSONDecoder().decode(User.self, from: userData),
-           let token = UserDefaults.standard.string(forKey: "authToken") {
+           let savedToken = UserDefaults.standard.string(forKey: "authToken") {
             
             user = savedUser
+            token = savedToken
             isAuthenticated = true
             
             // Устанавливаем токен для API и WebSocket
-            APIService.shared.setToken(token)
-            WebSocketService.shared.setToken(token)
+            APIService.shared.setToken(savedToken)
+            WebSocketService.shared.setToken(savedToken)
             
             // Передаем пользователя в WebSocketService
             WebSocketService.shared.setUser(savedUser)

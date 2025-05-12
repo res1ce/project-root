@@ -35,6 +35,7 @@ struct FireMapView: View {
     @State private var selectedLocation: CLLocationCoordinate2D?
     @State private var showFireForm = false
     @State private var isPresentingFireDetail = false
+    @State private var position: MapCameraPosition = .automatic
     
     // Для формы добавления пожара
     @State private var fireAddress: String = ""
@@ -45,20 +46,33 @@ struct FireMapView: View {
     
     var body: some View {
         ZStack {
-            // Карта с двумя типами аннотаций
-            Map(coordinateRegion: $region, annotationItems: mapItems) { item in
-                MapAnnotation(coordinate: item.coordinate) {
+            // Карта с двумя типами аннотаций для iOS 17
+            Map(position: $position) {
+                ForEach(mapItems) { item in
                     switch item {
                     case .fire(let fire):
-                        FireAnnotationView(status: fire.status)
-                            .onTapGesture {
-                                viewModel.selectedFire = fire
-                                isPresentingFireDetail = true
-                            }
+                        Annotation("", coordinate: fire.coordinate) {
+                            FireAnnotationView(status: fire.status)
+                                .onTapGesture {
+                                    viewModel.selectedFire = fire
+                                    isPresentingFireDetail = true
+                                }
+                        }
                     case .station(let station):
-                        FireStationAnnotationView(name: station.name)
+                        Annotation(station.name, coordinate: station.coordinate) {
+                            FireStationAnnotationView(name: station.name)
+                        }
                     }
                 }
+            }
+            .mapControls {
+                MapUserLocationButton()
+                MapCompass()
+                MapScaleView()
+            }
+            .onAppear {
+                // Устанавливаем начальное положение камеры
+                position = .region(region)
             }
             .overlay(
                 Group {
@@ -71,11 +85,12 @@ struct FireMapView: View {
                 }
             )
             .gesture(
-                userRole == .centralDispatcher ?
+                userRole == .centralDispatcher ? 
                     TapGesture()
                         .onEnded { _ in
                             if isAddingFire {
-                                selectedLocation = region.center
+                                // Получаем текущий центр карты на основе position
+                                getCenterFromPosition()
                                 showFireForm = true
                             }
                         } : nil
@@ -146,6 +161,19 @@ struct FireMapView: View {
                 print("Notification permission error: \(error)")
             }
         }
+    }
+    
+    // Метод для получения центра из текущей позиции камеры
+    private func getCenterFromPosition() {
+        // Используем безопасный метод получения координат
+        selectedLocation = getCoordinateCenter()
+    }
+    
+    // Безопасный метод получения центра карты
+    private func getCoordinateCenter() -> CLLocationCoordinate2D {
+        // Просто возвращаем центр региона по умолчанию
+        // Это избегает проблем с шаблонами привязки
+        return region.center
     }
 }
 

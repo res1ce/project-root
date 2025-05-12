@@ -4,21 +4,24 @@ struct MainTabView: View {
     @ObservedObject var authViewModel: AuthViewModel
     @StateObject var fireViewModel = FireIncidentsViewModel()
     @StateObject var adminViewModel = AdminViewModel()
+    @State private var selectedTab = 0
     
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             if let user = authViewModel.user {
                 // Карта пожаров
                 FireMapView(viewModel: fireViewModel, userRole: user.role)
                     .tabItem {
                         Label("Карта", systemImage: "map")
                     }
+                    .tag(0)
                 
                 // Список пожаров
                 FireIncidentsListView(viewModel: fireViewModel, userRole: user.role)
                     .tabItem {
                         Label("Пожары", systemImage: "flame")
                     }
+                    .tag(1)
                 
                 // Административный интерфейс только для администратора
                 if user.role == .admin {
@@ -26,6 +29,7 @@ struct MainTabView: View {
                         .tabItem {
                             Label("Админ", systemImage: "person.badge.key")
                         }
+                        .tag(2)
                 }
                 
                 // Профиль
@@ -33,11 +37,45 @@ struct MainTabView: View {
                     .tabItem {
                         Label("Профиль", systemImage: "person")
                     }
+                    .tag(3)
             }
         }
         .accentColor(.red)
         .onAppear {
+            // Установить WebSocket соединение и параметры авторизации
+            setupWebSocketConnection()
+            
+            // Загрузить данные
             fireViewModel.loadData()
+        }
+        .onChange(of: selectedTab, { oldValue, newValue in
+            // При изменении вкладки проверяем соединение WebSocket
+            ensureWebSocketConnection()
+        })
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // При возврате в приложение
+            ensureWebSocketConnection()
+            fireViewModel.loadData()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            // При выходе из приложения временно отключаем соединение
+            WebSocketService.shared.disconnect()
+        }
+    }
+    
+    private func setupWebSocketConnection() {
+        guard let token = authViewModel.token, let user = authViewModel.user else {
+            return
+        }
+        
+        WebSocketService.shared.setToken(token)
+        WebSocketService.shared.setUser(user)
+        WebSocketService.shared.connect()
+    }
+    
+    private func ensureWebSocketConnection() {
+        if authViewModel.isAuthenticated {
+            setupWebSocketConnection()
         }
     }
 }
@@ -75,6 +113,8 @@ struct ProfileView: View {
                 }
                 
                 Button(action: {
+                    // Отключаем WebSocket перед выходом
+                    WebSocketService.shared.disconnect()
                     authViewModel.logout()
                 }) {
                     Text("Выйти")

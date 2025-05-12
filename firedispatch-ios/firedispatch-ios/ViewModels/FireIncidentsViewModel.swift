@@ -70,32 +70,12 @@ class FireIncidentsViewModel: ObservableObject {
                 if case .failure(let error) = completion {
                     self?.error = error.description
                     print("Ошибка при загрузке уровней пожаров: \(error.description)")
-                    
-                    // Создаем уровни пожаров по умолчанию
-                    self?.createDefaultFireLevels()
                 }
             }, receiveValue: { [weak self] levels in
                 print("Загружено уровней пожаров: \(levels.count)")
-                
-                if levels.isEmpty {
-                    // Если уровни пожаров не получены, создаем по умолчанию
-                    self?.createDefaultFireLevels()
-                } else {
-                    self?.fireLevels = levels
-                }
+                self?.fireLevels = levels
             })
             .store(in: &cancellables)
-    }
-    
-    private func createDefaultFireLevels() {
-        print("Создание уровней пожаров по умолчанию")
-        fireLevels = [
-            FireLevel(id: 1, level: 1, name: "Уровень 1", description: "Небольшой пожар"),
-            FireLevel(id: 2, level: 2, name: "Уровень 2", description: "Средний пожар"),
-            FireLevel(id: 3, level: 3, name: "Уровень 3", description: "Крупный пожар"),
-            FireLevel(id: 4, level: 4, name: "Уровень 4", description: "Особо крупный пожар"),
-            FireLevel(id: 5, level: 5, name: "Уровень 5", description: "Чрезвычайная ситуация")
-        ]
     }
     
     func createFireIncident(coordinate: CLLocationCoordinate2D, address: String?, description: String?, fireLevelId: Int) {
