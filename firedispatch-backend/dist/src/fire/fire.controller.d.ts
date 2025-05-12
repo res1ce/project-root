@@ -47,8 +47,8 @@ export declare class FireController {
             updatedAt: Date;
             createdAt: Date;
             fireIncidentId: number;
-            content: string;
             userId: number;
+            content: string;
         }[];
         reportedBy: {
             id: number;
@@ -395,8 +395,8 @@ export declare class FireController {
             updatedAt: Date;
             createdAt: Date;
             fireIncidentId: number;
-            content: string;
             userId: number;
+            content: string;
         }[];
         reportedBy: {
             id: number;

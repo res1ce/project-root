@@ -24,8 +24,8 @@ export declare class ReportService {
         updatedAt: Date;
         createdAt: Date;
         fireIncidentId: number;
-        content: string;
         userId: number;
+        content: string;
     }>;
     getAll(): Promise<({
         user: {
@@ -43,8 +43,8 @@ export declare class ReportService {
         updatedAt: Date;
         createdAt: Date;
         fireIncidentId: number;
-        content: string;
         userId: number;
+        content: string;
     })[]>;
     getById(id: number): Promise<({
         user: {
@@ -62,24 +62,24 @@ export declare class ReportService {
         updatedAt: Date;
         createdAt: Date;
         fireIncidentId: number;
-        content: string;
         userId: number;
+        content: string;
     }) | null>;
     delete(id: number): Promise<{
         id: number;
         updatedAt: Date;
         createdAt: Date;
         fireIncidentId: number;
-        content: string;
         userId: number;
+        content: string;
     }>;
     createFireReport(userId: number, fireIncidentId: number, content: string): Promise<{
         id: number;
         updatedAt: Date;
         createdAt: Date;
         fireIncidentId: number;
-        content: string;
         userId: number;
+        content: string;
     }>;
     getFireReports(fireIncidentId: number): Promise<({
         user: {
@@ -91,8 +91,8 @@ export declare class ReportService {
         updatedAt: Date;
         createdAt: Date;
         fireIncidentId: number;
-        content: string;
         userId: number;
+        content: string;
     })[]>;
     generateFireIncidentPDF(fireIncidentId: number): Promise<string>;
     generateFireIncidentExcel(fireIncidentId: number): Promise<string>;

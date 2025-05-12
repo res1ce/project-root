@@ -20,8 +20,8 @@ export declare class AuthService {
             updatedAt: Date;
             createdAt: Date;
             fireIncidentId: number;
-            content: string;
             userId: number;
+            content: string;
         }[];
     } & {
         id: number;
