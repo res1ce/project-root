@@ -29,11 +29,25 @@ class APIService {
     
     private init() {}
     
-    private let baseURL = "http://localhost:3000/api" // Используем IP вместо localhost для работы на устройстве
+    // Используем IP-адрес или hostname вместо localhost для работы на реальном устройстве
+    // Для симулятора подойдет localhost, для реального устройства нужен IP-адрес компьютера
+    #if targetEnvironment(simulator)
+    private let baseURL = "http://localhost:3000/api"
+    private let wsURL = "http://localhost:3000"
+    #else
+    // Замените на фактический IP вашего компьютера в локальной сети
+    private let baseURL = "http://192.168.1.100:3000/api"
+    private let wsURL = "http://192.168.1.100:3000"
+    #endif
+    
     private var token: String?
     
     func setToken(_ token: String) {
         self.token = token
+    }
+    
+    func getWSURL() -> String {
+        return wsURL
     }
     
     private func createRequest(_ path: String, method: String, body: Data? = nil) -> URLRequest? {
@@ -232,41 +246,72 @@ class APIService {
     
     func getFireLevels() -> AnyPublisher<[FireLevel], APIError> {
         guard let request = createRequest("/fire/level", method: "GET") else {
-            return Fail(error: APIError.invalidURL).eraseToAnyPublisher()
+            return getDefaultFireLevels()
         }
         
         return URLSession.shared.dataTaskPublisher(for: request)
-            .tryMap { data, response in
+            .tryMap { data, response -> Data in
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw APIError.invalidResponse
                 }
                 
                 print("getFireLevels response status: \(httpResponse.statusCode)")
-                if httpResponse.statusCode == 403 {
-                    // Если у нас нет прав, возвращаем пустой список
-                    print("Нет прав для получения уровней пожаров, используем значения по умолчанию")
-                    return "[]".data(using: .utf8)!
-                }
                 
+                // Если ошибка доступа или любая другая ошибка, выбрасываем исключение
                 if httpResponse.statusCode != 200 {
+                    if httpResponse.statusCode == 403 || httpResponse.statusCode == 401 {
+                        print("Нет прав для получения уровней пожаров, используем значения по умолчанию")
+                    } else {
+                        print("Ошибка при получении уровней пожаров: \(httpResponse.statusCode), используем значения по умолчанию")
+                    }
+                    
                     throw APIError.httpError(httpResponse.statusCode)
                 }
                 
                 return data
             }
             .decode(type: [FireLevel].self, decoder: JSONDecoder())
-            .mapError { error in
+            .mapError { error -> APIError in
                 if let apiError = error as? APIError {
                     return apiError
                 } else if let _ = error as? URLError {
                     return APIError.invalidURL
                 } else if let error = error as? DecodingError {
+                    print("Ошибка декодирования при получении уровней пожаров: \(error)")
                     return APIError.decodingError(error)
                 } else {
                     return APIError.unknown(error)
                 }
             }
+            .catch { error -> AnyPublisher<[FireLevel], APIError> in
+                print("Перехватываем ошибку: \(error.description), возвращаем дефолтные уровни")
+                return self.getDefaultFireLevels()
+            }
             .eraseToAnyPublisher()
+    }
+    
+    // Вспомогательная функция для получения дефолтных уровней пожаров
+    private func getDefaultFireLevels() -> AnyPublisher<[FireLevel], APIError> {
+        // Дефолтные уровни, такие же как во фронтенде
+        let defaultLevels: [[String: Any]] = [
+            ["id": 1, "level": 1, "name": "Уровень 1", "description": "Небольшой пожар"],
+            ["id": 2, "level": 2, "name": "Уровень 2", "description": "Средний пожар"],
+            ["id": 3, "level": 3, "name": "Уровень 3", "description": "Крупный пожар"],
+            ["id": 4, "level": 4, "name": "Уровень 4", "description": "Особо крупный пожар"],
+            ["id": 5, "level": 5, "name": "Уровень 5", "description": "Чрезвычайная ситуация"]
+        ]
+        
+        do {
+            let defaultData = try JSONSerialization.data(withJSONObject: defaultLevels)
+            let defaultLevelObjects = try JSONDecoder().decode([FireLevel].self, from: defaultData)
+            print("Возвращаем дефолтные уровни пожаров")
+            return Just(defaultLevelObjects)
+                .setFailureType(to: APIError.self)
+                .eraseToAnyPublisher()
+        } catch {
+            print("Ошибка при создании дефолтных уровней пожаров: \(error)")
+            return Fail(error: APIError.unknown(error)).eraseToAnyPublisher()
+        }
     }
     
     // MARK: - Fire Incidents
@@ -421,7 +466,15 @@ class APIService {
                     print("Данные ответа: \(responseString)")
                 }
                 
-                if httpResponse.statusCode != 200 {
+                // Проверяем различные коды ошибок
+                if httpResponse.statusCode == 403 {
+                    print("Ошибка доступа при изменении уровня пожара: нет прав")
+                    throw APIError.httpError(httpResponse.statusCode)
+                } else if httpResponse.statusCode == 404 {
+                    print("Пожар не найден")
+                    throw APIError.httpError(httpResponse.statusCode)
+                } else if httpResponse.statusCode != 200 {
+                    print("Неизвестная ошибка при изменении уровня пожара")
                     throw APIError.httpError(httpResponse.statusCode)
                 }
                 
