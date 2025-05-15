@@ -572,7 +572,7 @@ export default function FireDetailsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Основная информация */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-md">
                 <h2 className="text-lg font-semibold mb-4">Основная информация</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
@@ -685,7 +685,7 @@ export default function FireDetailsPage() {
             
             {/* Техника на пожаре */}
             <div className="lg:col-span-1">
-              <div className="bg-white p-6 rounded-lg shadow-md h-full">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-md h-full">
                 <h2 className="text-lg font-semibold mb-4">Техника на пожаре</h2>
                 
                 {fire.dispatchedEngines && fire.dispatchedEngines.length > 0 ? (

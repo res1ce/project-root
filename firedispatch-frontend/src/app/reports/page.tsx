@@ -277,20 +277,20 @@ export default function ReportsPage() {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Отчеты</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Отчеты</h1>
+          <p className="text-gray-600 dark:text-gray-200 mt-1">
             Генерируйте отчеты о работе и просматривайте историю.
           </p>
         </div>
         
         {/* Блок генерации отчетов */}
-        <div className="bg-white p-6 shadow-md rounded-lg">
+        <div className="bg-white dark:bg-slate-900 p-6 shadow-md rounded-lg ">
           <h2 className="text-lg font-semibold mb-4">Создать новый отчет</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <h3 className="font-medium text-gray-800">Статистика за период</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="font-medium text-gray-800 dark:text-gray-100">Статистика за период</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-200">
                 Генерирует статистику по пожарам за выбранный период.
               </p>
               <div className="grid grid-cols-2 gap-2 mb-2">
@@ -339,14 +339,14 @@ export default function ReportsPage() {
             </div>
             
             <div className="space-y-4">
-              <h3 className="font-medium text-gray-800">Информация</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="font-medium text-gray-800 dark:text-gray-100">Информация</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-200">
                 Вы можете генерировать отчеты в формате PDF и Excel. После генерации отчета вы можете скачать его по ссылке в таблице ниже.
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-200">
                 Отчеты содержат информацию о пожарах, статистику и другие данные, которые могут быть полезны для анализа.
               </p>
-              <p className="text-sm text-gray-600 font-medium">
+              <p className="text-sm text-gray-600 dark:text-gray-200 font-medium">
                 PDF-отчеты содержат общую статистику, а Excel-отчеты дополнительно включают детальные таблицы с возможностью дальнейшей обработки данных.
               </p>
             </div>
@@ -354,7 +354,7 @@ export default function ReportsPage() {
         </div>
         
         {/* Фильтры для отчетов */}
-        <div className="bg-white p-4 shadow-md rounded-lg">
+        <div className="bg-white dark:bg-slate-900 p-4 shadow-md rounded-lg">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label htmlFor="report-type" className="block text-sm font-medium text-gray-700 mb-1">

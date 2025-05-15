@@ -449,7 +449,7 @@ export default function UsersAdminPage() {
     <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Управление пользователями</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Управление пользователями</h1>
           {!isAddingUser && !isEditingUser && (
             <button 
               onClick={() => setIsAddingUser(true)}

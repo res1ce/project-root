@@ -217,7 +217,7 @@ export default function FiresMapPage() {
     <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-800">Карта пожаров</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Карта пожаров</h1>
            
           {isAllowedToAddFire && (
             <button 

@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/auth-store';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function AppHeader() {
   const { user, logout } = useAuthStore();
@@ -50,7 +51,7 @@ export default function AppHeader() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center">
-              <span className="font-bold text-xl">МЧС Диспетчер</span>
+              <span className="font-bold text-xl text-white">МЧС Диспетчер</span>
             </Link>
           </div>
 
@@ -62,8 +63,8 @@ export default function AppHeader() {
                 href={item.href}
                 className={`px-3 py-2 rounded-md text-sm font-medium 
                   ${pathname === item.href 
-                    ? 'bg-red-800 text-white' 
-                    : 'text-white hover:bg-red-600 hover:text-white'
+                    ? 'bg-red-800 dark:bg-slate-900 text-white' 
+                    : 'text-white hover:bg-red-600 dark:hover:bg-slate-800 hover:text-white'
                   }`}
               >
                 {item.label}
@@ -72,24 +73,28 @@ export default function AppHeader() {
           </nav>
 
           <div className="hidden md:flex items-center">
-            <div className="mr-4 text-sm">
+            <div className="mr-4 text-sm text-white">
               {user?.username} ({user?.role === 'admin' ? 'Администратор' : 
                 user?.role === 'central_dispatcher' ? 'Центральный диспетчер' : 
                 'Диспетчер части'})
             </div>
-            <button
-              onClick={handleLogout}
-              className="bg-red-800 hover:bg-red-900 text-white px-4 py-2 rounded-md text-sm font-medium"
-            >
-              Выйти
-            </button>
+            <div className="flex items-center space-x-2">
+              <ThemeToggle />
+              <button
+                onClick={handleLogout}
+                className="bg-red-800 hover:bg-red-900 dark:bg-red-900 dark:hover:bg-red-800 text-white px-4 py-2 rounded-md text-sm font-medium"
+              >
+                Выйти
+              </button>
+            </div>
           </div>
 
           {/* Кнопка меню для мобильных устройств */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center space-x-2">
+            <ThemeToggle />
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-white hover:bg-red-600 focus:outline-none"
+              className="inline-flex items-center justify-center p-2 rounded-md text-white hover:bg-red-600 dark:hover:bg-slate-800 focus:outline-none"
             >
               <svg 
                 className={`h-6 w-6 ${isMobileMenuOpen ? 'hidden' : 'block'}`} 
@@ -123,8 +128,8 @@ export default function AppHeader() {
               href={item.href}
               className={`block px-3 py-2 rounded-md text-base font-medium 
                 ${pathname === item.href 
-                  ? 'bg-red-800 text-white' 
-                  : 'text-white hover:bg-red-600 hover:text-white'
+                  ? 'bg-red-800 dark:bg-red-900 text-white' 
+                  : 'text-white hover:bg-red-600 dark:hover:bg-slate-800 hover:text-white'
                 }`}
               onClick={() => setIsMobileMenuOpen(false)}
             >
@@ -133,7 +138,7 @@ export default function AppHeader() {
           ))}
           <button
             onClick={handleLogout}
-            className="w-full text-left block px-3 py-2 rounded-md text-base font-medium bg-red-800 text-white hover:bg-red-900 mt-2"
+            className="w-full text-left block px-3 py-2 rounded-md text-base font-medium bg-red-800 dark:bg-red-900 text-white hover:bg-red-900 dark:hover:bg-red-800 mt-2"
           >
             Выйти ({user?.username})
           </button>

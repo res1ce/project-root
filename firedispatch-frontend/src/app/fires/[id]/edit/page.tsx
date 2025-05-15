@@ -330,7 +330,7 @@ export default function EditFirePage() {
           </Link>
         </div>
         
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-md">
           <form onSubmit={handleSubmit}>
             <div className="mb-6">
               <h2 className="text-lg font-semibold mb-4">Местоположение пожара</h2>

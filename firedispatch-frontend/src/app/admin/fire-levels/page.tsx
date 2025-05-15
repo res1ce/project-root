@@ -435,7 +435,7 @@ export default function FireLevelsAdminPage() {
   if (currentUser?.role !== 'admin') {
     return (
       <AppLayout>
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-md">
           У вас нет доступа к этой странице. Только администраторы могут управлять уровнями пожаров.
         </div>
       </AppLayout>
@@ -446,7 +446,7 @@ export default function FireLevelsAdminPage() {
     <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Управление уровнями пожаров</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Управление уровнями пожаров</h1>
           <div className="space-x-3">
             <button 
               onClick={() => {
@@ -454,7 +454,7 @@ export default function FireLevelsAdminPage() {
                 setIsAddingLevel(true);
                 setIsAddingAddress(false);
               }}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm"
+              className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm"
               disabled={isAddingLevel || isAddingRequirement || isAddingAddress}
             >
               Добавить уровень
@@ -465,7 +465,7 @@ export default function FireLevelsAdminPage() {
                 setIsAddingRequirement(true);
                 setIsAddingAddress(false);
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm"
               disabled={isAddingLevel || isAddingRequirement || isAddingAddress}
             >
               Добавить требование
@@ -476,7 +476,7 @@ export default function FireLevelsAdminPage() {
                 setIsAddingRequirement(false);
                 setIsAddingAddress(true);
               }}
-              className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-md text-sm"
+              className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 text-white px-4 py-2 rounded-md text-sm"
               disabled={isAddingLevel || isAddingRequirement || isAddingAddress}
             >
               Добавить адрес
@@ -486,11 +486,11 @@ export default function FireLevelsAdminPage() {
         
         {/* Форма добавления уровня пожара */}
         {isAddingLevel && (
-          <div className="bg-white p-6 shadow-md rounded-lg mb-6">
-            <h2 className="text-lg font-semibold mb-4">Новый уровень пожара</h2>
+          <div className="bg-white dark:bg-slate-900 p-6 shadow-md rounded-lg mb-6">
+            <h2 className="text-lg font-semibold mb-4 dark:text-white">Новый уровень пожара</h2>
             <form onSubmit={handleSubmitLevel} className="space-y-4">
               <div>
-                <label htmlFor="level-number" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="level-number" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Номер уровня* (от 1 до 5)
                 </label>
                 <input
@@ -500,13 +500,13 @@ export default function FireLevelsAdminPage() {
                   max={5}
                   value={newLevelNumber}
                   onChange={(e) => setNewLevelNumber(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                 />
               </div>
               
               <div>
-                <label htmlFor="level-name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="level-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Название уровня*
                 </label>
                 <input
@@ -514,20 +514,20 @@ export default function FireLevelsAdminPage() {
                   type="text"
                   value={newLevelName}
                   onChange={(e) => setNewLevelName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                 />
               </div>
               
               <div>
-                <label htmlFor="level-description" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="level-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Описание*
                 </label>
                 <textarea
                   id="level-description"
                   value={newLevelDescription}
                   onChange={(e) => setNewLevelDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                   rows={3}
                 />
@@ -537,14 +537,14 @@ export default function FireLevelsAdminPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddingLevel(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingLevel}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
                 >
                   {isSubmittingLevel ? 'Сохранение...' : 'Сохранить'}
                 </button>
@@ -555,18 +555,18 @@ export default function FireLevelsAdminPage() {
         
         {/* Форма добавления требования */}
         {isAddingRequirement && (
-          <div className="bg-white p-6 shadow-md rounded-lg mb-6">
-            <h2 className="text-lg font-semibold mb-4">Новое требование к уровню</h2>
+          <div className="bg-white dark:bg-slate-900 p-6 shadow-md rounded-lg mb-6">
+            <h2 className="text-lg font-semibold mb-4 dark:text-white">Новое требование к уровню</h2>
             <form onSubmit={handleSubmitRequirement} className="space-y-4">
               <div>
-                <label htmlFor="req-level" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="req-level" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Уровень пожара*
                 </label>
                 <select
                   id="req-level"
                   value={requirementLevelId}
                   onChange={(e) => setRequirementLevelId(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                 >
                   <option value={0}>Выберите уровень</option>
@@ -579,14 +579,14 @@ export default function FireLevelsAdminPage() {
               </div>
               
               <div>
-                <label htmlFor="req-engine-type" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="req-engine-type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Тип пожарной машины*
                 </label>
                 <select
                   id="req-engine-type"
                   value={requirementEngineTypeId}
                   onChange={(e) => setRequirementEngineTypeId(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                 >
                   <option value={0}>Выберите тип машины</option>
@@ -599,7 +599,7 @@ export default function FireLevelsAdminPage() {
               </div>
               
               <div>
-                <label htmlFor="req-count" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="req-count" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Количество*
                 </label>
                 <input
@@ -608,7 +608,7 @@ export default function FireLevelsAdminPage() {
                   min={1}
                   value={requirementCount}
                   onChange={(e) => setRequirementCount(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                   required
                 />
               </div>
@@ -617,14 +617,14 @@ export default function FireLevelsAdminPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddingRequirement(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingRequirement}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
                 >
                   {isSubmittingRequirement ? 'Сохранение...' : 'Сохранить'}
                 </button>
@@ -635,12 +635,12 @@ export default function FireLevelsAdminPage() {
         
         {/* Форма добавления адреса */}
         {isAddingAddress && (
-          <div className="bg-white p-6 shadow-md rounded-lg mb-6" ref={formAddressRef}>
-            <h2 className="text-lg font-semibold mb-4">Новый адрес с предопределенным уровнем пожара</h2>
+          <div className="bg-white dark:bg-slate-900 p-6 shadow-md rounded-lg mb-6" ref={formAddressRef}>
+            <h2 className="text-lg font-semibold mb-4 dark:text-white">Новый адрес с предопределенным уровнем пожара</h2>
             <form onSubmit={handleSubmitAddress} className="space-y-4">
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="address-text" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="address-text" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Адрес*
                   </label>
                   <input
@@ -648,21 +648,21 @@ export default function FireLevelsAdminPage() {
                     type="text"
                     value={newAddressText}
                     onChange={(e) => setNewAddressText(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                     required
                     placeholder="Введите адрес"
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="address-level" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="address-level" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Уровень пожара*
                   </label>
                   <select
                     id="address-level"
                     value={newAddressLevelId}
                     onChange={(e) => setNewAddressLevelId(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                     required
                   >
                     <option value={0}>Выберите уровень</option>
@@ -675,14 +675,14 @@ export default function FireLevelsAdminPage() {
                 </div>
                 
                 <div>
-                  <label htmlFor="address-description" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="address-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Описание
                   </label>
                   <textarea
                     id="address-description"
                     value={newAddressDescription}
                     onChange={(e) => setNewAddressDescription(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-slate-800 dark:text-white rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
                     rows={2}
                     placeholder="Дополнительное описание адреса (необязательно)"
                   />
@@ -692,13 +692,13 @@ export default function FireLevelsAdminPage() {
                   <button
                     type="button"
                     onClick={() => setShowMapForAddress(!showMapForAddress)}
-                    className="mb-4 text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                    className="mb-4 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center"
                   >
                     {showMapForAddress ? 'Скрыть карту' : 'Показать карту для выбора координат'}
                   </button>
                   
                   {showMapForAddress && (
-                    <div className="border rounded-md overflow-hidden h-[400px] mb-4">
+                    <div className="border dark:border-gray-700 rounded-md overflow-hidden h-[400px] mb-4">
                       <DynamicMap 
                         allowCreation={true}
                         onLocationSelect={handleMapCoordinatesSelect}
@@ -708,9 +708,9 @@ export default function FireLevelsAdminPage() {
                   )}
                   
                   {selectedMapCoordinates && (
-                    <div className="bg-blue-50 p-3 rounded-md mb-4">
-                      <p className="text-sm font-medium text-blue-800">Выбранные координаты:</p>
-                      <p className="text-sm text-blue-600">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md mb-4">
+                      <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Выбранные координаты:</p>
+                      <p className="text-sm text-blue-600 dark:text-blue-400">
                         Широта: {selectedMapCoordinates[0].toFixed(6)}, 
                         Долгота: {selectedMapCoordinates[1].toFixed(6)}
                       </p>
@@ -726,14 +726,14 @@ export default function FireLevelsAdminPage() {
                     setIsAddingAddress(false);
                     setShowMapForAddress(false);
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingAddress}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
                 >
                   {isSubmittingAddress ? 'Сохранение...' : 'Сохранить'}
                 </button>
@@ -750,43 +750,43 @@ export default function FireLevelsAdminPage() {
         ) : (
           <div className="space-y-6">
             {levels.length === 0 ? (
-              <div className="bg-white text-center py-12 text-gray-500 shadow-md rounded-lg">
+              <div className="bg-white dark:bg-slate-900 text-center py-12 text-gray-500 dark:text-gray-400 shadow-md rounded-lg">
                 Уровни пожаров не найдены. Создайте первый уровень.
               </div>
             ) : (
               levels.map(level => (
-                <div key={level.id} className="bg-white shadow-md rounded-lg overflow-hidden">
-                  <div className="p-6 border-b">
+                <div key={level.id} className="bg-white dark:bg-slate-900 shadow-md rounded-lg overflow-hidden">
+                  <div className="p-6 border-b dark:border-gray-700">
                     <div className="flex justify-between items-start mb-2">
-                      <h2 className="text-xl font-semibold text-gray-800">
+                      <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
                         Уровень {level.level}: {level.name}
                       </h2>
                       <button 
                         onClick={() => handleDeleteLevel(level.id)}
-                        className="text-sm text-red-600 hover:text-red-800"
+                        className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                         disabled={level.requirements.length > 0}
                       >
                         Удалить
                       </button>
                     </div>
-                    <p className="text-gray-600">{level.description}</p>
+                    <p className="text-gray-600 dark:text-gray-300">{level.description}</p>
                   </div>
                   
                   <div className="p-6">
-                    <h3 className="text-lg font-medium text-gray-800 mb-3">Требования</h3>
+                    <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-3">Требования</h3>
                     
                     {level.requirements.length === 0 ? (
-                      <p className="text-gray-500">Нет требований для этого уровня.</p>
+                      <p className="text-gray-500 dark:text-gray-400">Нет требований для этого уровня.</p>
                     ) : (
                       <div className="space-y-3">
                         {level.requirements.map(requirement => (
-                          <div key={requirement.id} className="flex justify-between items-center p-3 border rounded-md bg-gray-50">
-                            <div>
+                          <div key={requirement.id} className="flex justify-between items-center p-3 border dark:border-gray-700 rounded-md bg-gray-50 dark:bg-slate-800">
+                            <div className="dark:text-gray-200">
                               <span className="font-medium">{getVehicleTypeName(requirement.engineType?.name || requirement.vehicleType || '')}:</span> {requirement.count} шт.
                             </div>
                             <button 
                               onClick={() => handleDeleteRequirement(level.id, requirement.id)}
-                              className="text-sm text-red-600 hover:text-red-800"
+                              className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                             >
                               Удалить
                             </button>
@@ -797,7 +797,7 @@ export default function FireLevelsAdminPage() {
                     
                     <div className="mt-4">
                       <button 
-                        className="text-sm text-blue-600 hover:text-blue-800"
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                         onClick={() => {
                           setRequirementLevelId(level.id);
                           setIsAddingRequirement(true);
@@ -814,15 +814,15 @@ export default function FireLevelsAdminPage() {
         )}
         
         {/* Список адресов с предопределенными уровнями пожаров */}
-        <div className="bg-white shadow-md rounded-lg overflow-hidden p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Адреса с предопределенными уровнями пожаров</h2>
+        <div className="bg-white dark:bg-slate-900 shadow-md rounded-lg overflow-hidden p-6">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Адреса с предопределенными уровнями пожаров</h2>
           
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
             </div>
           ) : addressLevels.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               Адреса с предопределенными уровнями пожаров не найдены. Добавьте первый адрес.
             </div>
           ) : (
@@ -832,21 +832,21 @@ export default function FireLevelsAdminPage() {
                 const level = levels.find(l => l.id === address.fireLevelId) || address.fireLevel;
                 
                 return (
-                  <div key={address.id} className="border rounded-md p-4 bg-gray-50 flex justify-between items-start">
+                  <div key={address.id} className="border dark:border-gray-700 rounded-md p-4 bg-gray-50 dark:bg-slate-800 flex justify-between items-start">
                     <div>
-                      <p className="font-medium text-gray-800">{address.address}</p>
+                      <p className="font-medium text-gray-800 dark:text-gray-200">{address.address}</p>
                       {address.description && (
-                        <p className="text-gray-600 text-sm mt-1">{address.description}</p>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{address.description}</p>
                       )}
                       {level && (
-                        <p className="text-sm mt-2 bg-amber-100 inline-block px-2 py-1 rounded-md">
+                        <p className="text-sm mt-2 bg-amber-100 dark:bg-amber-900/30 inline-block px-2 py-1 rounded-md dark:text-amber-200">
                           Уровень: <span className="font-medium">{level.name}</span>
                         </p>
                       )}
                     </div>
                     <button 
                       onClick={() => handleDeleteAddress(address.id)}
-                      className="text-sm text-red-600 hover:text-red-800"
+                      className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                     >
                       Удалить
                     </button>
@@ -858,7 +858,7 @@ export default function FireLevelsAdminPage() {
           
           <div className="mt-6">
             <button 
-              className="text-sm text-amber-600 hover:text-amber-800 flex items-center"
+              className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 flex items-center"
               onClick={scrollToAddressForm}
               disabled={isAddingLevel || isAddingRequirement || isAddingAddress}
             >

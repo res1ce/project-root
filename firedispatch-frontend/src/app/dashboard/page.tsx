@@ -28,10 +28,10 @@ export default function DashboardPage() {
         console.error('Error fetching dashboard stats:', error);
         // Если API еще не реализовано или вернуло ошибку, используем моковые данные
         setStats({
-          totalFires: 14,
+          totalFires: 24,
           activeFiresCount: 3,
-          resolvedFiresCount: 11,
-          stationsCount: 5
+          resolvedFiresCount: 21,
+          stationsCount: 8
         });
       } finally {
         setLoading(false);
@@ -45,8 +45,8 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Панель управления</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold">Панель управления</h1>
+          <p className="text-secondary mt-1">
             Добро пожаловать, {user?.username}!
           </p>
         </div>
@@ -60,37 +60,33 @@ export default function DashboardPage() {
             <StatCard 
               title="Всего пожаров" 
               value={stats?.totalFires || 0} 
-              bgColor="bg-blue-50" 
-              textColor="text-blue-700" 
-              icon={<FireIcon className="w-8 h-8 text-blue-500" />} 
+              colorTheme="blue" 
+              icon={<FireIcon className="w-8 h-8 text-blue-500 dark:text-blue-400" />} 
             />
             <StatCard 
               title="Активные пожары" 
               value={stats?.activeFiresCount || 0} 
-              bgColor="bg-red-50" 
-              textColor="text-red-700" 
-              icon={<ActiveFireIcon className="w-8 h-8 text-red-500" />} 
+              colorTheme="red" 
+              icon={<ActiveFireIcon className="w-8 h-8 text-red-500 dark:text-red-400" />} 
             />
             <StatCard 
               title="Потушенные пожары" 
               value={stats?.resolvedFiresCount || 0} 
-              bgColor="bg-green-50" 
-              textColor="text-green-700" 
-              icon={<CheckIcon className="w-8 h-8 text-green-500" />} 
+              colorTheme="green" 
+              icon={<CheckIcon className="w-8 h-8 text-green-500 dark:text-green-400" />} 
             />
             <StatCard 
               title="Пожарные части" 
               value={stats?.stationsCount || 0} 
-              bgColor="bg-amber-50" 
-              textColor="text-amber-700" 
-              icon={<StationIcon className="w-8 h-8 text-amber-500" />} 
+              colorTheme="amber" 
+              icon={<StationIcon className="w-8 h-8 text-amber-500 dark:text-amber-400" />} 
             />
           </div>
         )}
 
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Быстрые действия */}
-          <div className="bg-white shadow rounded-lg p-6">
+          <div className="card bg-white dark:bg-slate-900 shadow-lg rounded-lg">
             <h2 className="text-lg font-semibold mb-4">Быстрые действия</h2>
             <div className="space-y-4">
               {user?.role === 'central_dispatcher' && (
@@ -133,25 +129,25 @@ export default function DashboardPage() {
           </div>
 
           {/* Информационная панель */}
-          <div className="bg-white shadow rounded-lg p-6">
+          <div className="card bg-white dark:bg-slate-900 shadow-lg rounded-lg">
             <h2 className="text-lg font-semibold mb-4">Информация о системе</h2>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Статус системы:</span>
-                <span className="font-semibold text-green-600">Работает</span>
+                <span className="text-secondary">Статус системы:</span>
+                <span className="font-semibold text-green-600 dark:text-green-400">Работает</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Роль пользователя:</span>
+                <span className="text-secondary">Роль пользователя:</span>
                 <span className="font-semibold">{formatRole(user?.role || '')}</span>
               </div>
               {user?.role === 'station_dispatcher' && user.fireStationId && (
                 <div className="flex justify-between">
-                  <span className="text-gray-600">ID пожарной части:</span>
+                  <span className="text-secondary">ID пожарной части:</span>
                   <span className="font-semibold">{user.fireStationId}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-gray-600">Последнее обновление:</span>
+                <span className="text-secondary">Последнее обновление:</span>
                 <span className="font-semibold">{new Date().toLocaleString()}</span>
               </div>
             </div>
@@ -167,22 +163,37 @@ export default function DashboardPage() {
 interface StatCardProps {
   title: string;
   value: number;
-  bgColor: string;
-  textColor: string;
+  colorTheme: 'blue' | 'red' | 'green' | 'amber';
   icon: React.ReactNode;
 }
 
-const StatCard = ({ title, value, bgColor, textColor, icon }: StatCardProps) => (
-  <div className={`${bgColor} p-6 rounded-lg shadow-sm`}>
-    <div className="flex items-center">
-      <div className="mr-4">{icon}</div>
-      <div>
-        <p className="text-gray-600 text-sm">{title}</p>
-        <p className={`text-2xl font-bold ${textColor}`}>{value}</p>
+const StatCard = ({ title, value, colorTheme, icon }: StatCardProps) => {
+  const bgColorClasses = {
+    blue: 'bg-blue-50 dark:bg-blue-950/30',
+    red: 'bg-red-50 dark:bg-red-950/30',
+    green: 'bg-green-50 dark:bg-green-950/30',
+    amber: 'bg-amber-50 dark:bg-amber-950/30'
+  };
+  
+  const textColorClasses = {
+    blue: 'text-blue-700 dark:text-blue-300',
+    red: 'text-red-700 dark:text-red-300',
+    green: 'text-green-700 dark:text-green-300',
+    amber: 'text-amber-700 dark:text-amber-300'
+  };
+  
+  return (
+    <div className={`${bgColorClasses[colorTheme]} p-6 rounded-lg shadow-sm`}>
+      <div className="flex items-center">
+        <div className="mr-4">{icon}</div>
+        <div>
+          <p className="text-secondary text-sm">{title}</p>
+          <p className={`text-2xl font-bold ${textColorClasses[colorTheme]}`}>{value}</p>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface ActionButtonProps {
   label: string;
@@ -191,8 +202,8 @@ interface ActionButtonProps {
 }
 
 const ActionButton = ({ label, href, icon }: ActionButtonProps) => (
-  <Link href={href} className="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors">
-    <span className="bg-red-100 rounded-full p-2 mr-3">{icon}</span>
+  <Link href={href} className="flex items-center p-3 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md transition-colors">
+    <span className="bg-red-100 dark:bg-red-900/40 rounded-full p-2 mr-3">{icon}</span>
     <span className="font-medium">{label}</span>
   </Link>
 );
@@ -271,6 +282,6 @@ const UserIcon = ({ className }: { className?: string }) => (
 
 const TruckIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m-4 9h12m0 0l-4-4m4 4l-4 4M4 5v11a2 2 0 002 2h2.343a2 2 0 001.414-.586l4.656-4.656a2 2 0 00.586-1.414V9.343a2 2 0 00-.586-1.414l-4.656-4.656A2 2 0 008.343 3H6a2 2 0 00-2 2z" />
   </svg>
 ); 

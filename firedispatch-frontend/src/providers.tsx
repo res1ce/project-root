@@ -25,7 +25,27 @@ export function Providers({ children }: ProvidersProps) {
 
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster position="top-right" toastOptions={{
+        className: 'dark:bg-gray-800 dark:text-white',
+        style: {
+          borderRadius: '8px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        },
+        success: {
+          style: {
+            background: 'var(--green-500)',
+            color: 'white',
+          },
+          className: 'dark:bg-green-600',
+        },
+        error: {
+          style: {
+            background: 'var(--red-500)',
+            color: 'white',
+          },
+          className: 'dark:bg-red-600',
+        },
+      }} />
       <NotificationsProvider>
         {children}
       </NotificationsProvider>
