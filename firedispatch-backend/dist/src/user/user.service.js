@@ -69,10 +69,22 @@ let UserService = class UserService {
         }
         const data = {
             username: dto.username,
-            role: dto.roleId ? dto.roleId : undefined,
             fireStationId: dto.fireStationId,
             name: dto.name,
         };
+        if (dto.roleId) {
+            switch (dto.roleId) {
+                case 1:
+                    data.role = 'ADMIN';
+                    break;
+                case 2:
+                    data.role = 'CENTRAL_DISPATCHER';
+                    break;
+                case 3:
+                    data.role = 'STATION_DISPATCHER';
+                    break;
+            }
+        }
         if (dto.password) {
             data.password = await bcrypt.hash(dto.password, 10);
         }

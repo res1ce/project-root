@@ -16,51 +16,51 @@ export declare class UserController {
     };
     createUser(dto: CreateUserDto, req: RequestWithUser): Promise<{
         id: number;
-        updatedAt: Date;
-        name: string;
-        createdAt: Date;
-        fireStationId: number | null;
         username: string;
         password: string;
         role: import(".prisma/client").$Enums.UserRole;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        fireStationId: number | null;
     }>;
     getUserActivities(userId?: string, action?: string, limit?: string): Promise<({
         user: {
             id: number;
-            updatedAt: Date;
-            name: string;
-            createdAt: Date;
-            fireStationId: number | null;
             username: string;
             password: string;
             role: import(".prisma/client").$Enums.UserRole;
+            name: string;
+            createdAt: Date;
+            updatedAt: Date;
+            fireStationId: number | null;
         };
     } & {
         id: number;
+        userId: number;
         action: string;
         details: string | null;
         timestamp: Date;
-        userId: number;
         ipAddress: string | null;
         userAgent: string | null;
     })[]>;
     getUserActivityById(id: string): Promise<({
         user: {
             id: number;
-            updatedAt: Date;
-            name: string;
-            createdAt: Date;
-            fireStationId: number | null;
             username: string;
             password: string;
             role: import(".prisma/client").$Enums.UserRole;
+            name: string;
+            createdAt: Date;
+            updatedAt: Date;
+            fireStationId: number | null;
         };
     } & {
         id: number;
+        userId: number;
         action: string;
         details: string | null;
         timestamp: Date;
-        userId: number;
         ipAddress: string | null;
         userAgent: string | null;
     })[]>;

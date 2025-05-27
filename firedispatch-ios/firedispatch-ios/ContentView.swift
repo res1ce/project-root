@@ -2,20 +2,24 @@
 //  ContentView.swift
 //  firedispatch-ios
 //
-//  Created by Иван Вишняков on 12.05.2025.
+//  Created by Иван Вишняков on 26.05.2025.
 //
 
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var appState = AppState()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        if appState.isLoading {
+            LoadingView()
+        } else if appState.isAuthenticated {
+            AdminDashboardView()
+                .environmentObject(appState)
+        } else {
+            LoginView()
+                .environmentObject(appState)
         }
-        .padding()
     }
 }
 

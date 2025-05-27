@@ -65,10 +65,24 @@ export class UserService {
     // Подготавливаем данные для обновления
     const data: any = {
       username: dto.username,
-      role: dto.roleId ? dto.roleId : undefined,
       fireStationId: dto.fireStationId,
       name: dto.name,
     };
+    
+    // Преобразуем roleId в строковое представление для Prisma
+    if (dto.roleId) {
+      switch (dto.roleId) {
+        case 1:
+          data.role = 'ADMIN';
+          break;
+        case 2:
+          data.role = 'CENTRAL_DISPATCHER';
+          break;
+        case 3:
+          data.role = 'STATION_DISPATCHER';
+          break;
+      }
+    }
     
     // Если передан пароль, хешируем его
     if (dto.password) {

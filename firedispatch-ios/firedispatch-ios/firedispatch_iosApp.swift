@@ -2,33 +2,42 @@
 //  firedispatch_iosApp.swift
 //  firedispatch-ios
 //
-//  Created by Иван Вишняков on 12.05.2025.
+//  Created by Иван Вишняков on 26.05.2025.
 //
 
 import SwiftUI
-import UserNotifications
 
 @main
 struct firedispatch_iosApp: App {
-    @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var appState = AppState()
     
     var body: some Scene {
         WindowGroup {
-            ZStack {
-                if authViewModel.isAuthenticated {
-                    MainTabView(authViewModel: authViewModel)
-                } else {
-                    LoginView(viewModel: authViewModel)
-                }
-            }
-            .onAppear {
-                // Запрашиваем разрешение на уведомления при запуске
-                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { success, error in
-                    if let error = error {
-                        print("Notification permission error: \(error)")
-                    }
-                }
+            if appState.isLoading {
+                LoadingView()
+            } else if appState.isAuthenticated {
+                AdminDashboardView()
+                    .environmentObject(appState)
+            } else {
+                LoginView()
+                    .environmentObject(appState)
             }
         }
+    }
+}
+
+struct LoadingView: View {
+    var body: some View {
+        VStack {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle())
+                .scaleEffect(1.5)
+            
+            Text("Загрузка...")
+                .font(.headline)
+                .padding(.top, 20)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
     }
 }
