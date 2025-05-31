@@ -346,14 +346,14 @@ export default function FireDetailsPage() {
         
         console.log("Создание карты с центром:", [fire.longitude, fire.latitude]);
         
+        // Создаем экземпляр карты
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const map = await mapglInstance.create('map-container', {
+        mapInstance = new mapglInstance.Map(mapContainerRef.current, {
           center: [fire.longitude, fire.latitude], // [lng, lat] для 2GIS
           zoom: 13,
           key: API_KEY,
         });
         
-        mapInstanceRef.current = map;
         mapInstanceRef.current = mapInstance;
         
         // Добавляем маркер пожара
