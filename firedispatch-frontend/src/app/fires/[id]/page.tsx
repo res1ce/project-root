@@ -9,6 +9,14 @@ import { toast } from '@/components/ui/toast';
 import Link from 'next/link';
 import { load } from '@2gis/mapgl';
 
+// Определение типов для 2GIS API
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MapglInstance = any; // Тип для экземпляра карты
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MapMarker = any; // Тип для маркера на карте
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MapPopup = any; // Тип для всплывающего окна
+
 // API ключ для 2GIS
 const API_KEY = process.env.NEXT_PUBLIC_2GIS_API_KEY || '';
 
@@ -97,6 +105,16 @@ interface DispatchedEngine {
   };
 }
 
+interface Vehicle {
+  id: number;
+  model: string;
+  type: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  fireStationId: number;
+}
+
 interface FireLevel {
   id: number;
   level: number;
@@ -105,6 +123,7 @@ interface FireLevel {
 }
 
 // Функция для получения широты и долготы из объекта Fire
+// Используется внутри компонента
 const getFireCoordinates = (fire: Fire): [number, number] => {
   if (fire.latitude !== undefined && fire.longitude !== undefined) {
     return [fire.latitude, fire.longitude];
@@ -137,6 +156,7 @@ const getFireStationName = (fire: Fire): string => {
 };
 
 // Функция для получения координат станции
+// Используется внутри компонента
 const getStationCoordinates = (fire: Fire): [number, number] | null => {
   if (fire.assignedStation?.latitude !== undefined && fire.assignedStation?.longitude !== undefined) {
     return [fire.assignedStation.latitude, fire.assignedStation.longitude];
@@ -148,40 +168,80 @@ const getStationCoordinates = (fire: Fire): [number, number] | null => {
 
 export default function FireDetailsPage() {
   const { id } = useParams();
+  // router используется в других частях компонента
   const router = useRouter();
   const { user } = useAuthStore();
   
   const [fire, setFire] = useState<Fire | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // error используется в других частях компонента
   const [error, setError] = useState<string | null>(null);
   const [fireLevels, setFireLevels] = useState<FireLevel[]>([]);
+  // Используется при обновлении уровня пожара
   const [selectedLevelId, setSelectedLevelId] = useState<number>(0);
   const [isUpdatingLevel, setIsUpdatingLevel] = useState(false);
   const [isResolvingFire, setIsResolvingFire] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<{[key: string]: any}>({});
-  const activePopupRef = useRef<any>(null);
+  const mapInstanceRef = useRef<MapglInstance | null>(null);
+  const markersRef = useRef<{[key: string]: MapMarker}>({});
+  const activePopupRef = useRef<MapPopup | null>(null);
 
   // Загружаем данные о пожаре
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fetchFireDetails = async () => {
       setIsLoading(true);
       
       try {
         // Получаем детали пожара
-        const response = await api.get(`/api/fire/${id}`);
-        setFire(response.data);
+        const response = await api.get(`/fires/${id}`);
+        const fireData = response.data;
         
         // Получаем доступные уровни пожара для выбора
         const levelsResponse = await api.get('/api/fire-level');
         setFireLevels(levelsResponse.data);
         
         // Устанавливаем уровень пожара для селекта
-        if (response.data.levelId) {
-          setSelectedLevelId(response.data.levelId);
+        if (fireData.levelId) {
+          setSelectedLevelId(fireData.levelId);
+        }
+        
+        // Получаем назначенную технику для пожара
+        try {
+          const assignmentsResponse = await api.get(`/api/fire/${id}/assignments`);
+          const vehicles = assignmentsResponse.data;
+          
+          // Преобразуем данные о технике в формат, ожидаемый интерфейсом
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const dispatchedEngines = vehicles.map((vehicle: Vehicle) => ({
+            id: vehicle.id,
+            fireId: fireData.id,
+            engineId: vehicle.id,
+            dispatchedAt: vehicle.updatedAt, // Используем updatedAt как время отправки
+            arrivedAt: null, // У нас нет данных о прибытии
+            status: vehicle.status, // Используем статус техники
+            engine: {
+              id: vehicle.id,
+              type: vehicle.model || vehicle.type || 'Неизвестный тип', // Используем модель или тип
+              number: `#${vehicle.id}`, // Используем ID как номер
+              fireStationId: vehicle.fireStationId
+            }
+          }));
+          
+          // Объединяем данные о пожаре с данными о технике
+          const fireWithAssignments = {
+            ...fireData,
+            dispatchedEngines: dispatchedEngines
+          };
+          
+          setFire(fireWithAssignments);
+          console.log('[DEBUG] Данные о пожаре с техникой:', fireWithAssignments);
+        } catch (assignError) {
+          console.log('[DEBUG] Техника не назначена или ошибка при загрузке:', assignError);
+          // Если техника не назначена, используем данные без техники
+          setFire(fireData);
         }
       } catch (error: any) {
         console.error('Ошибка при загрузке деталей пожара:', error);
@@ -230,10 +290,13 @@ export default function FireDetailsPage() {
   useEffect(() => {
     if (!mapContainerRef.current || !fire) return;
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let mapglInstance: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let mapInstance: any;
     
-    async function initMap() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const initMap = async () => {
       try {
         console.log("Инициализация карты 2GIS для деталей пожара...");
         setMapError(null);
@@ -272,20 +335,24 @@ export default function FireDetailsPage() {
         // Загружаем SDK 2GIS
         mapglInstance = await load();
         
-        // Проверяем наличие координат пожара
-        if (!fire || typeof fire.longitude !== 'number' || typeof fire.latitude !== 'number') {
-          throw new Error('Некорректные координаты пожара');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (fire && fire.latitude && fire.longitude) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (typeof fire.longitude !== 'number' || typeof fire.latitude !== 'number') {
+            throw new Error('Некорректные координаты пожара');
+          }
         }
         
         console.log("Создание карты с центром:", [fire.longitude, fire.latitude]);
         
-        // Создаем экземпляр карты
-        mapInstance = new mapglInstance.Map(mapContainerRef.current, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const map = await mapglInstance.create('map-container', {
           center: [fire.longitude, fire.latitude], // [lng, lat] для 2GIS
           zoom: 13,
           key: API_KEY,
         });
         
+        mapInstanceRef.current = map;
         mapInstanceRef.current = mapInstance;
         
         // Добавляем маркер пожара
@@ -400,6 +467,7 @@ export default function FireDetailsPage() {
   }, [fire]);
   
   // Обработчик обновления уровня пожара
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleUpdateLevel = async () => {
     if (!selectedLevelId || selectedLevelId === fire?.levelId) return;
     
@@ -432,6 +500,7 @@ export default function FireDetailsPage() {
   };
   
   // Обработчик отметки пожара как потушенного
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleResolveFire = async () => {
     if (!fire) return;
     
@@ -509,6 +578,12 @@ export default function FireDetailsPage() {
         return 'Возвращается';
       case 'returned':
         return 'Вернулась';
+      case 'ON_DUTY':
+        return 'В работе';
+      case 'AVAILABLE':
+        return 'Доступна';
+      case 'MAINTENANCE':
+        return 'Обслуживание';
       default:
         return status;
     }
@@ -697,7 +772,14 @@ export default function FireDetailsPage() {
                       >
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="font-medium">{dispatch.engine.type} {dispatch.engine.number}</h3>
+                            <h3 className="font-medium">
+                              {dispatch.engine ? 
+                                `${dispatch.engine.type || 'Неизвестный тип'} ${dispatch.engine.number || ''}` : 
+                                'Техника без данных'}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              Статус: {getEngineStatusText(dispatch.status || 'ON_DUTY')}
+                            </p>
                             <p className="text-sm text-gray-600">
                               Отправлена: {formatDate(dispatch.dispatchedAt)}
                             </p>

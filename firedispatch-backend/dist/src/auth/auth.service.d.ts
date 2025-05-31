@@ -7,31 +7,31 @@ export declare class AuthService {
     validateUser(username: string, password: string): Promise<{
         fireStation: {
             id: number;
-            name: string;
-            createdAt: Date;
             updatedAt: Date;
+            name: string;
             address: string;
             latitude: number;
             longitude: number;
             phoneNumber: string | null;
+            createdAt: Date;
         } | null;
         reports: {
             id: number;
-            createdAt: Date;
             updatedAt: Date;
-            content: string;
-            userId: number;
+            createdAt: Date;
             fireIncidentId: number;
+            userId: number;
+            content: string;
         }[];
     } & {
         id: number;
+        updatedAt: Date;
+        name: string;
+        createdAt: Date;
+        fireStationId: number | null;
         username: string;
         password: string;
         role: import(".prisma/client").$Enums.UserRole;
-        name: string;
-        createdAt: Date;
-        updatedAt: Date;
-        fireStationId: number | null;
     }>;
     login(username: string, password: string): Promise<{
         access_token: string;
