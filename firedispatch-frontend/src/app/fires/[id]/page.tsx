@@ -196,7 +196,8 @@ export default function FireDetailsPage() {
       
       try {
         // Получаем детали пожара
-        const response = await api.get(`/fires/${id}`);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const response = await api.get(`/api/fire/${id}`);
         const fireData = response.data;
         
         // Получаем доступные уровни пожара для выбора
