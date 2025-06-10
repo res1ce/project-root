@@ -19,7 +19,7 @@ import SwiftUI
 
 struct NetworkConfig {
     // Базовый URL для API
-    static let baseURL = "http://localhost:3000/api"
+    static let baseURL = "https://api.fire-dispatch.ru/api"
     
     // Таймаут для запросов (в секундах)
     static let requestTimeout: Double = 30

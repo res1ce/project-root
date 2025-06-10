@@ -126,6 +126,7 @@ export default function RootLayout({
           href="/images/favicon.ico"
           sizes="any"
         />
+        <title>МЧС Диспетчер</title>
       </head>
       <body className={inter.className}>
         <Providers>

@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		72BEF0292DE481E900C4D09B /* firedispatch-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "firedispatch-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		72BEF0292DE481E900C4D09B /* МЧС Диспетчер.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "МЧС Диспетчер.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -40,7 +40,7 @@
 		72BEF02A2DE481E900C4D09B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				72BEF0292DE481E900C4D09B /* firedispatch-ios.app */,
+				72BEF0292DE481E900C4D09B /* МЧС Диспетчер.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -67,7 +67,7 @@
 			packageProductDependencies = (
 			);
 			productName = "firedispatch-ios";
-			productReference = 72BEF0292DE481E900C4D09B /* firedispatch-ios.app */;
+			productReference = 72BEF0292DE481E900C4D09B /* МЧС Диспетчер.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 72BEF0242DE481E900C4D09B /* Build configuration list for PBXProject "firedispatch-ios" */;
+			buildConfigurationList = 72BEF0242DE481E900C4D09B /* Build configuration list for PBXProject "МЧС Диспетчер" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -267,7 +267,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "mobile.firedispatch-ios";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "МЧС Диспетчер";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -295,7 +295,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "mobile.firedispatch-ios";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "МЧС Диспетчер";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -305,7 +305,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		72BEF0242DE481E900C4D09B /* Build configuration list for PBXProject "firedispatch-ios" */ = {
+		72BEF0242DE481E900C4D09B /* Build configuration list for PBXProject "МЧС Диспетчер" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				72BEF0322DE481EA00C4D09B /* Debug */,
